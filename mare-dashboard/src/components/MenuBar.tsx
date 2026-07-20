@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useStore } from '@/store/useStore';
+import { PanelLeft, PanelBottom, PanelRight, LayoutTemplate, Search, Monitor, Settings, UserCircle } from 'lucide-react';
 
-type MenuState = 'File' | 'Edit' | 'Selection' | 'View' | 'Go' | 'Run' | 'Terminal' | 'Help' | null;
+type MenuState = 'File' | 'Edit' | 'Run' | 'Terminal' | 'Help' | 'Settings' | 'Profile' | null;
 
 interface MenuBarProps {
   onNewFile: () => void;
@@ -44,28 +45,61 @@ export default function MenuBar({ onNewFile, onNewFolder }: MenuBarProps) {
     );
   };
 
-  const { addTerminalLog } = useStore();
+  const { addTerminalLog, editorCode } = useStore();
 
   const handleAction = (actionName: string) => {
     addTerminalLog(`> <span class="text-text-secondary">Action triggered:</span> ${actionName}`);
+  };
+
+  const handleOpenFile = async () => {
+    try {
+      const [fileHandle] = await (window as any).showOpenFilePicker();
+      const file = await fileHandle.getFile();
+      const contents = await file.text();
+      useStore.getState().setEditorCode(contents);
+      addTerminalLog(`> <span class="text-accent-green">Success:</span> Opened file [${file.name}]`);
+    } catch (err) {
+      addTerminalLog(`> <span class="text-accent-red">Error:</span> Failed to open file`);
+    }
+  };
+
+  const handleOpenFolder = async () => {
+    try {
+      const dirHandle = await (window as any).showDirectoryPicker();
+      addTerminalLog(`> <span class="text-accent-green">Success:</span> Opened folder [${dirHandle.name}]`);
+    } catch (err) {
+      addTerminalLog(`> <span class="text-accent-red">Error:</span> Failed to open folder`);
+    }
+  };
+
+  const handleSaveFile = async () => {
+    try {
+      const fileHandle = await (window as any).showSaveFilePicker();
+      const writable = await fileHandle.createWritable();
+      await writable.write(useStore.getState().editorCode);
+      await writable.close();
+      addTerminalLog(`> <span class="text-accent-green">Success:</span> File saved`);
+    } catch (err) {
+      addTerminalLog(`> <span class="text-accent-red">Error:</span> Failed to save file`);
+    }
   };
 
   const renderDropdown = () => {
     if (activeMenu === 'File') {
       return (
         <div className="absolute top-full left-0 mt-0 py-1 w-64 bg-[#252526] border border-[#3c3c3c] shadow-lg rounded-md z-50">
-          <MenuItem label="New Text File" shortcut="Ctrl+N" onClick={onNewFile} />
-          <MenuItem label="New File..." shortcut="Ctrl+Alt+Windows+N" onClick={onNewFile} />
-          <MenuItem label="New Folder..." shortcut="Ctrl+Shift+N" onClick={onNewFolder} />
+          <MenuItem label="New Text File" shortcut="Ctrl+N" onClick={handleSaveFile} />
+          <MenuItem label="New File..." shortcut="Ctrl+Alt+Windows+N" onClick={handleSaveFile} />
+          <MenuItem label="New Folder..." shortcut="Ctrl+Shift+N" onClick={handleOpenFolder} />
           <MenuItem divider />
-          <MenuItem label="Open File..." shortcut="Ctrl+O" onClick={() => handleAction('Open File')} />
-          <MenuItem label="Open Folder..." shortcut="Ctrl+K Ctrl+O" onClick={() => handleAction('Open Folder')} />
-          <MenuItem label="Open Workspace from File..." onClick={() => handleAction('Open Workspace')} />
+          <MenuItem label="Open File..." shortcut="Ctrl+O" onClick={handleOpenFile} />
+          <MenuItem label="Open Folder..." shortcut="Ctrl+K Ctrl+O" onClick={handleOpenFolder} />
+          <MenuItem label="Open Workspace from File..." onClick={handleOpenFile} />
           <MenuItem label="Open Recent" onClick={() => handleAction('Open Recent')} />
           <MenuItem divider />
-          <MenuItem label="Save" shortcut="Ctrl+S" onClick={() => handleAction('Save')} />
-          <MenuItem label="Save As..." shortcut="Ctrl+Shift+S" onClick={() => handleAction('Save As')} />
-          <MenuItem label="Save All" shortcut="Ctrl+K S" onClick={() => handleAction('Save All')} />
+          <MenuItem label="Save" shortcut="Ctrl+S" onClick={handleSaveFile} />
+          <MenuItem label="Save As..." shortcut="Ctrl+Shift+S" onClick={handleSaveFile} />
+          <MenuItem label="Save All" shortcut="Ctrl+K S" onClick={handleSaveFile} />
           <MenuItem divider />
           <MenuItem label="Exit" onClick={() => handleAction('Exit')} />
         </div>
@@ -88,90 +122,9 @@ export default function MenuBar({ onNewFile, onNewFolder }: MenuBarProps) {
         </div>
       );
     }
-    if (activeMenu === 'Selection') {
-      return (
-        <div className="absolute top-full left-24 mt-0 py-1 w-[320px] bg-[#252526] border border-[#3c3c3c] shadow-lg rounded-md z-50">
-          <MenuItem label="Select All" shortcut="Ctrl+A" onClick={() => handleAction('Select All')} />
-          <MenuItem label="Expand Selection" shortcut="Shift+Alt+RightArrow" onClick={() => handleAction('Expand Selection')} />
-          <MenuItem label="Shrink Selection" shortcut="Shift+Alt+LeftArrow" onClick={() => handleAction('Shrink Selection')} />
-          <MenuItem divider />
-          <MenuItem label="Copy Line Up" shortcut="Shift+Alt+UpArrow" onClick={() => handleAction('Copy Line Up')} />
-          <MenuItem label="Copy Line Down" shortcut="Shift+Alt+DownArrow" onClick={() => handleAction('Copy Line Down')} />
-          <MenuItem label="Move Line Up" shortcut="Alt+UpArrow" onClick={() => handleAction('Move Line Up')} />
-          <MenuItem label="Move Line Down" shortcut="Alt+DownArrow" onClick={() => handleAction('Move Line Down')} />
-          <MenuItem label="Duplicate Selection" onClick={() => handleAction('Duplicate Selection')} />
-          <MenuItem divider />
-          <MenuItem label="Add Cursor Above" shortcut="Ctrl+Alt+UpArrow" onClick={() => handleAction('Add Cursor Above')} />
-          <MenuItem label="Add Cursor Below" shortcut="Ctrl+Alt+DownArrow" onClick={() => handleAction('Add Cursor Below')} />
-          <MenuItem label="Add Cursors to Line Ends" shortcut="Shift+Alt+I" onClick={() => handleAction('Add Cursors to Line Ends')} />
-          <MenuItem label="Add Next Occurrence" shortcut="Ctrl+D" onClick={() => handleAction('Add Next Occurrence')} />
-          <MenuItem label="Add Previous Occurrence" onClick={() => handleAction('Add Previous Occurrence')} />
-          <MenuItem label="Select All Occurrences" onClick={() => handleAction('Select All Occurrences')} />
-          <MenuItem divider />
-          <MenuItem label="Switch to Ctrl+Click for Multi-Cursor" onClick={() => handleAction('Switch to Ctrl+Click for Multi-Cursor')} />
-          <MenuItem label="Column Selection Mode" onClick={() => handleAction('Column Selection Mode')} />
-        </div>
-      );
-    }
-    if (activeMenu === 'View') {
-      return (
-        <div className="absolute top-full left-36 mt-0 py-1 w-64 bg-[#252526] border border-[#3c3c3c] shadow-lg rounded-md z-50">
-          <MenuItem label="Command Palette..." shortcut="Ctrl+Shift+P" onClick={() => handleAction('Command Palette')} />
-          <MenuItem label="Open View..." onClick={() => handleAction('Open View')} />
-          <MenuItem divider />
-          <MenuItem label="Appearance" shortcut=">" onClick={() => handleAction('Appearance')} />
-          <MenuItem label="Editor Layout" shortcut=">" onClick={() => handleAction('Editor Layout')} />
-          <MenuItem divider />
-          <MenuItem label="Explorer" shortcut="Ctrl+Shift+E" onClick={() => handleAction('Explorer')} />
-          <MenuItem label="Search" shortcut="Ctrl+Shift+F" onClick={() => handleAction('Search')} />
-          <MenuItem label="Source Control" shortcut="Ctrl+Shift+G" onClick={() => handleAction('Source Control')} />
-          <MenuItem label="Run" shortcut="Ctrl+Shift+D" onClick={() => handleAction('Run View')} />
-          <MenuItem label="Extensions" shortcut="Ctrl+Shift+X" onClick={() => handleAction('Extensions')} />
-          <MenuItem label="Testing" onClick={() => handleAction('Testing')} />
-          <MenuItem divider />
-          <MenuItem label="Problems" shortcut="Ctrl+Shift+M" onClick={() => handleAction('Problems')} />
-          <MenuItem label="Output" shortcut="Ctrl+Shift+U" onClick={() => handleAction('Output')} />
-          <MenuItem label="Debug Console" shortcut="Ctrl+Shift+Y" onClick={() => handleAction('Debug Console')} />
-          <MenuItem label="Terminal" shortcut="Ctrl+`" onClick={() => handleAction('Terminal')} />
-          <MenuItem divider />
-          <MenuItem label="Word Wrap" shortcut="Alt+Z" onClick={() => handleAction('Word Wrap')} />
-        </div>
-      );
-    }
-    if (activeMenu === 'Go') {
-      return (
-        <div className="absolute top-full left-[190px] mt-0 py-1 w-[320px] bg-[#252526] border border-[#3c3c3c] shadow-lg rounded-md z-50">
-          <MenuItem label="Back" shortcut="Alt+LeftArrow" onClick={() => handleAction('Back')} />
-          <MenuItem label="Forward" shortcut="Alt+RightArrow" onClick={() => handleAction('Forward')} />
-          <MenuItem label="Last Edit Location" shortcut="Ctrl+K Ctrl+Q" onClick={() => handleAction('Last Edit Location')} />
-          <MenuItem divider />
-          <MenuItem label="Switch Editor" shortcut=">" onClick={() => handleAction('Switch Editor')} />
-          <MenuItem label="Switch Group" shortcut=">" onClick={() => handleAction('Switch Group')} />
-          <MenuItem divider />
-          <MenuItem label="Go to File..." shortcut="Ctrl+P" onClick={() => handleAction('Go to File')} />
-          <MenuItem label="Go to Symbol in Workspace..." shortcut="Ctrl+T" onClick={() => handleAction('Go to Symbol in Workspace')} />
-          <MenuItem divider />
-          <MenuItem label="Go to Symbol in Editor..." shortcut="Ctrl+Shift+O" onClick={() => handleAction('Go to Symbol in Editor')} />
-          <MenuItem label="Go to Definition" shortcut="F12" onClick={() => handleAction('Go to Definition')} />
-          <MenuItem label="Go to Declaration" onClick={() => handleAction('Go to Declaration')} />
-          <MenuItem label="Go to Type Definition" onClick={() => handleAction('Go to Type Definition')} />
-          <MenuItem label="Go to Implementations" shortcut="Ctrl+F12" onClick={() => handleAction('Go to Implementations')} />
-          <MenuItem label="Go to References" shortcut="Shift+F12" onClick={() => handleAction('Go to References')} />
-          <MenuItem divider />
-          <MenuItem label="Go to Line/Column..." shortcut="Ctrl+G" onClick={() => handleAction('Go to Line')} />
-          <MenuItem label="Go to Bracket" shortcut="Ctrl+Shift+\\" onClick={() => handleAction('Go to Bracket')} />
-          <MenuItem divider />
-          <MenuItem label="Next Problem" shortcut="F8" onClick={() => handleAction('Next Problem')} />
-          <MenuItem label="Previous Problem" shortcut="Shift+F8" onClick={() => handleAction('Previous Problem')} />
-          <MenuItem divider />
-          <MenuItem label="Next Change" shortcut="Alt+F3" onClick={() => handleAction('Next Change')} />
-          <MenuItem label="Previous Change" shortcut="Shift+Alt+F3" onClick={() => handleAction('Previous Change')} />
-        </div>
-      );
-    }
     if (activeMenu === 'Run') {
       return (
-        <div className="absolute top-full left-[220px] mt-0 py-1 w-72 bg-[#252526] border border-[#3c3c3c] shadow-lg rounded-md z-50">
+        <div className="absolute top-full left-[110px] mt-0 py-1 w-72 bg-[#252526] border border-[#3c3c3c] shadow-lg rounded-md z-50">
           <MenuItem label="Start Debugging" shortcut="F5" onClick={() => handleAction('Start Debugging')} />
           <MenuItem label="Run Without Debugging" shortcut="Ctrl+F5" onClick={() => handleAction('Run Without Debugging')} />
           <MenuItem label="Stop Debugging" shortcut="Shift+F5" onClick={() => handleAction('Stop Debugging')} />
@@ -198,7 +151,7 @@ export default function MenuBar({ onNewFile, onNewFolder }: MenuBarProps) {
     }
     if (activeMenu === 'Terminal') {
       return (
-        <div className="absolute top-full left-[260px] mt-0 py-1 w-72 bg-[#252526] border border-[#3c3c3c] shadow-lg rounded-md z-50">
+        <div className="absolute top-full left-[150px] mt-0 py-1 w-72 bg-[#252526] border border-[#3c3c3c] shadow-lg rounded-md z-50">
           <MenuItem label="New Terminal" shortcut="Ctrl+Shift+`" onClick={() => handleAction('New Terminal')} />
           <MenuItem label="Split Terminal" shortcut="Ctrl+Shift+5" onClick={() => handleAction('Split Terminal')} />
           <MenuItem label="New Terminal Window" shortcut="Ctrl+Shift+Alt+`" onClick={() => handleAction('New Terminal Window')} />
@@ -219,7 +172,7 @@ export default function MenuBar({ onNewFile, onNewFolder }: MenuBarProps) {
     }
     if (activeMenu === 'Help') {
       return (
-        <div className="absolute top-full left-[320px] mt-0 py-1 w-64 bg-[#252526] border border-[#3c3c3c] shadow-lg rounded-md z-50">
+        <div className="absolute top-full left-[220px] mt-0 py-1 w-64 bg-[#252526] border border-[#3c3c3c] shadow-lg rounded-md z-50">
           <MenuItem label="Welcome" onClick={() => handleAction('Welcome')} />
           <MenuItem label="Show All Commands" shortcut="Ctrl+Shift+P" onClick={() => handleAction('Show All Commands')} />
           <MenuItem label="Documentation" onClick={() => handleAction('Documentation')} />
@@ -246,24 +199,82 @@ export default function MenuBar({ onNewFile, onNewFolder }: MenuBarProps) {
         </div>
       );
     }
+    if (activeMenu === 'Settings') {
+      return (
+        <div className="absolute top-full right-8 mt-0 py-1 w-56 bg-[#252526] border border-[#3c3c3c] shadow-lg rounded-md z-50">
+          <MenuItem label="Command Palette..." shortcut="Ctrl+Shift+P" onClick={() => handleAction('Command Palette')} />
+          <MenuItem divider />
+          <MenuItem label="Settings" shortcut="Ctrl+," onClick={() => handleAction('Settings')} />
+          <MenuItem label="Extensions" shortcut="Ctrl+Shift+X" onClick={() => handleAction('Extensions')} />
+          <MenuItem label="Keyboard Shortcuts" shortcut="Ctrl+K Ctrl+S" onClick={() => handleAction('Keyboard Shortcuts')} />
+          <MenuItem divider />
+          <MenuItem label="User Snippets" onClick={() => handleAction('User Snippets')} />
+          <MenuItem label="Color Theme" shortcut="Ctrl+K Ctrl+T" onClick={() => handleAction('Color Theme')} />
+          <MenuItem label="File Icon Theme" onClick={() => handleAction('File Icon Theme')} />
+          <MenuItem divider />
+          <MenuItem label="Check for Updates..." onClick={() => handleAction('Check for Updates')} />
+        </div>
+      );
+    }
+    if (activeMenu === 'Profile') {
+      return (
+        <div className="absolute top-full right-1 mt-0 py-1 w-56 bg-[#252526] border border-[#3c3c3c] shadow-lg rounded-md z-50">
+          <MenuItem label="Sign In to Sync Settings..." onClick={() => handleAction('Sign In')} />
+          <MenuItem divider />
+          <MenuItem label="Account Settings" onClick={() => handleAction('Account Settings')} />
+          <MenuItem label="Manage Trusted Extensions" onClick={() => handleAction('Manage Trusted Extensions')} />
+          <MenuItem divider />
+          <MenuItem label="Sign Out" onClick={() => handleAction('Sign Out')} />
+        </div>
+      );
+    }
     return null;
   };
 
-  const navItems: MenuState[] = ['File', 'Edit', 'Selection', 'View', 'Go', 'Run', 'Terminal', 'Help'];
+  const navItems: MenuState[] = ['File', 'Edit', 'Run', 'Terminal', 'Help'];
 
   return (
-    <div ref={menuRef} className="flex h-8 shrink-0 items-center bg-[#181818] px-2 text-[13px] text-[#cccccc] relative font-sans border-b border-[#2b2b2b]">
-      {navItems.map((item) => (
-        <div 
-          key={item}
-          className={`px-2 py-1 cursor-pointer rounded-md mx-0.5 ${activeMenu === item ? 'bg-[#3c3c3c] text-white' : 'hover:bg-white/10 hover:text-white'}`}
-          onClick={() => setActiveMenu(activeMenu === item ? null : item)}
-          onMouseEnter={() => handleHover(item)}
-        >
-          {item}
+    <div ref={menuRef} className="flex h-9 w-full shrink-0 items-center justify-between bg-[#181818] px-2 text-[13px] text-[#cccccc] relative font-sans border-b border-[#2b2b2b] select-none z-50">
+      <div className="flex items-center h-full">
+        {/* Logo placeholder */}
+        <div className="flex items-center justify-center w-8 h-full mr-1 cursor-default">
+          <div className="w-4 h-4 bg-brand-500 rounded-sm"></div>
         </div>
-      ))}
-      {renderDropdown()}
+        {navItems.map((item) => (
+          <div 
+            key={item}
+            className={`px-2 py-1 cursor-pointer rounded-md mx-0.5 flex items-center ${activeMenu === item ? 'bg-[#3c3c3c] text-white' : 'hover:bg-white/10 hover:text-white'}`}
+            onClick={() => setActiveMenu(activeMenu === item ? null : item)}
+            onMouseEnter={() => handleHover(item)}
+          >
+            {item}
+          </div>
+        ))}
+        {renderDropdown()}
+      </div>
+
+      <div className="flex items-center h-full gap-2 pr-2">
+        <div className="flex items-center gap-1.5 mr-2">
+          <button className="flex items-center justify-center w-7 h-7 rounded hover:bg-[#313232] transition-colors">
+            <PanelRight size={15} />
+          </button>
+          
+          <div className="w-px h-4 bg-[#454545] mx-1"></div>
+          
+          <button 
+            className={`flex items-center justify-center w-7 h-7 rounded transition-colors ${activeMenu === 'Settings' ? 'bg-[#313232] text-white' : 'hover:bg-[#313232]'}`}
+            onClick={() => setActiveMenu(activeMenu === 'Settings' ? null : 'Settings')}
+          >
+            <Settings size={15} />
+          </button>
+          <button 
+            className={`flex items-center justify-center w-7 h-7 rounded transition-colors ${activeMenu === 'Profile' ? 'bg-[#313232] text-white' : 'hover:bg-[#313232]'}`}
+            onClick={() => setActiveMenu(activeMenu === 'Profile' ? null : 'Profile')}
+          >
+            <UserCircle size={15} />
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

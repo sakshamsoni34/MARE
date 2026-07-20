@@ -27,6 +27,11 @@ export default function PropertiesPanel() {
               <option>Scikit-Learn</option>
               <option>TensorFlow</option>
               <option>PyTorch</option>
+              <option>Keras</option>
+              <option>XGBoost</option>
+              <option>LightGBM</option>
+              <option>LangChain</option>
+              <option>LlamaIndex</option>
             </select>
           </div>
           <div className="space-y-2">
@@ -44,6 +49,33 @@ export default function PropertiesPanel() {
               defaultValue={`You are the ${activeAgent}. Your goal is to ensure the integrity of the data pipeline.`} 
               className="w-full bg-[var(--color-bg-tertiary)] border border-[var(--color-border-secondary)] rounded-lg px-3 py-2.5 text-sm text-white outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all shadow-sm resize-none" 
             />
+          </div>
+
+          <div className="space-y-2 pt-2 border-t border-[var(--color-border-primary)]">
+            <label className="text-sm font-medium text-text-secondary flex justify-between items-center">
+              <span>Anomaly Threshold</span>
+              <span className="text-xs bg-brand-500/20 text-brand-400 px-2 py-0.5 rounded font-mono">85%</span>
+            </label>
+            <input 
+              type="range" 
+              min="0" max="100" step="1" 
+              defaultValue="85" 
+              className="w-full accent-brand-500 cursor-pointer h-1.5 bg-[var(--color-border-secondary)] rounded-lg appearance-none outline-none" 
+            />
+            <div className="flex justify-between text-[10px] text-text-tertiary">
+              <span>Permissive</span>
+              <span>Strict</span>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between pt-2 border-t border-[var(--color-border-primary)]">
+            <div>
+              <p className="text-sm font-medium text-text-secondary">Auto-Execute</p>
+              <p className="text-[11px] text-text-tertiary mt-0.5">Run node automatically</p>
+            </div>
+            <div className="w-9 h-5 bg-brand-500 rounded-full flex items-center p-0.5 cursor-pointer transition-colors shadow-inner">
+              <div className="w-4 h-4 bg-white rounded-full transform translate-x-4 shadow-sm transition-transform duration-200"></div>
+            </div>
           </div>
         </div>
       </div>

@@ -1,16 +1,28 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Play, Bell, Search, Activity, Cpu } from 'lucide-react';
 import Sidebar from '@/components/Sidebar';
 import PropertiesPanel from '@/components/PropertiesPanel';
 import TerminalOutput from '@/components/TerminalOutput';
 import CodeEditor from '@/components/CodeEditor';
 import WorkflowVisualizer from '@/components/WorkflowVisualizer';
+import MenuBar from '@/components/MenuBar';
 import { useStore } from '@/store/useStore';
 
 export default function Dashboard() {
-  const { isRunning, setIsRunning, addTerminalLog, clearTerminalLogs } = useStore();
+  const { isRunning, setIsRunning, addTerminalLog, clearTerminalLogs, isTerminalOpen } = useStore();
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey && (e.key === '`' || e.key === '~')) {
+        e.preventDefault();
+        useStore.getState().toggleTerminal();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const handleStartResearch = () => {
     if (isRunning) return;
@@ -39,6 +51,7 @@ export default function Dashboard() {
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden text-base bg-[var(--color-bg-primary)]">
+      <MenuBar onNewFile={() => {}} onNewFolder={() => {}} />
       {/* Top Navigation Bar */}
       <header className="flex h-16 shrink-0 items-center justify-between border-b border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] px-6">
         <div className="flex items-center gap-3">
@@ -71,14 +84,6 @@ export default function Dashboard() {
             <Play size={16} fill="currentColor" />
             {isRunning ? 'Running...' : 'Start Research'}
           </button>
-          <div className="h-6 w-px bg-[var(--color-border-secondary)]"></div>
-          <Activity size={20} className="text-text-secondary cursor-pointer hover:text-white transition-colors" />
-          <Bell size={20} className="text-text-secondary cursor-pointer hover:text-white transition-colors" />
-          <div className="flex items-center gap-2 cursor-pointer">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-brand-500 to-brand-700 text-sm font-bold text-white shadow-sm ring-2 ring-[var(--color-border-primary)] hover:ring-brand-400 transition-all">
-              RT
-            </div>
-          </div>
         </div>
       </header>
 
@@ -92,7 +97,7 @@ export default function Dashboard() {
             <CodeEditor />
             <WorkflowVisualizer />
           </div>
-          <TerminalOutput />
+          {isTerminalOpen && <TerminalOutput />}
         </main>
 
         <PropertiesPanel />

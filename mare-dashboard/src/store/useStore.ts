@@ -5,6 +5,7 @@ export type Agent = 'Orchestrator (Manager)' | 'Researcher' | 'Software Engineer
 
 interface StoreState {
   // State
+  projects: string[];
   activeProject: string;
   activeAgent: Agent | null;
   terminalLogs: string[];
@@ -12,6 +13,7 @@ interface StoreState {
   workflowNodes: Node[];
   workflowEdges: Edge[];
   isRunning: boolean;
+  isTerminalOpen: boolean;
 
   // Actions
   setActiveProject: (project: string) => void;
@@ -22,36 +24,29 @@ interface StoreState {
   setWorkflowNodes: (nodes: Node[]) => void;
   setWorkflowEdges: (edges: Edge[]) => void;
   setIsRunning: (isRunning: boolean) => void;
+  toggleTerminal: () => void;
+  createNewProject: (name: string, description?: string, goal?: string, source?: string, priority?: string) => void;
+  deleteProject: (name: string) => void;
 }
 
-const initialCode = `import pandas as pd
-from sklearn.ensemble import RandomForestClassifier
+const initialCode = `# No active project selected.\\n# Create a new research project to begin.\\n`;
 
-# Initialize fraud detection model
-rf_model = RandomForestClassifier()
-
-rf_model.fit(X_train, y_train)`;
-
-const initialNodes: Node[] = [
-  { id: '1', position: { x: 0, y: 100 }, data: { label: 'Researcher' }, type: 'default' },
-  { id: '2', position: { x: 250, y: 100 }, data: { label: 'Data Analyst' }, type: 'default' },
-];
-
-const initialEdges: Edge[] = [
-  { id: 'e1-2', source: '1', target: '2' },
-];
+const initialNodes: Node[] = [];
+const initialEdges: Edge[] = [];
 
 export const useStore = create<StoreState>((set) => ({
-  activeProject: 'Market Analysis',
+  projects: [],
+  activeProject: '',
   activeAgent: 'Orchestrator (Manager)',
   terminalLogs: [
     '> Status: IDLE...',
-    '> Multi-Agent system ready for deployment.'
+    '> System ready. Create a new research project to deploy agents.'
   ],
   editorCode: initialCode,
   workflowNodes: initialNodes,
   workflowEdges: initialEdges,
   isRunning: false,
+  isTerminalOpen: false,
 
   setActiveProject: (project) => set({ activeProject: project }),
   setActiveAgent: (agent) => set({ activeAgent: agent }),
@@ -61,4 +56,42 @@ export const useStore = create<StoreState>((set) => ({
   setWorkflowNodes: (nodes) => set({ workflowNodes: nodes }),
   setWorkflowEdges: (edges) => set({ workflowEdges: edges }),
   setIsRunning: (isRunning) => set({ isRunning }),
+  toggleTerminal: () => set((state) => ({ isTerminalOpen: !state.isTerminalOpen })),
+  createNewProject: (name, description, goal, source, priority) => set((state) => {
+    if (state.projects.includes(name)) return state;
+    
+    let metaText = ``;
+    if (description) metaText += `\\n# Details: ${description}`;
+    if (goal) metaText += `\\n# Goal: ${goal}`;
+    if (source) metaText += `\\n# Data Source: ${source}`;
+    if (priority) metaText += `\\n# Priority: ${priority}`;
+
+    const initialCode = `# Research Project: ${name}${metaText}\\n\\n# Write your research code here...\\n`;
+    
+    return {
+      projects: [...state.projects, name],
+      activeProject: name,
+      editorCode: initialCode,
+      terminalLogs: [
+        '> Status: IDLE...', 
+        `> New research project "${name}" initialized.`,
+        ...(description ? [`> Context: ${description}`] : []),
+        ...(goal ? [`> Goal: ${goal}`] : []),
+        ...(priority ? [`> Priority: ${priority}`] : [])
+      ],
+      workflowNodes: [],
+      workflowEdges: []
+    };
+  }),
+  deleteProject: (name) => set((state) => {
+    const newProjects = state.projects.filter(p => p !== name);
+    const newActiveProject = state.activeProject === name 
+      ? (newProjects.length > 0 ? newProjects[0] : '') 
+      : state.activeProject;
+    return {
+      projects: newProjects,
+      activeProject: newActiveProject,
+      terminalLogs: [...state.terminalLogs, `> Project "${name}" deleted.`]
+    };
+  }),
 }));

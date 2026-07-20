@@ -1,9 +1,12 @@
-import React, { useEffect, useRef } from 'react';
-import { Terminal } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { Terminal, Plus, ChevronDown, AtSign, Columns, Trash2, MoreHorizontal, Maximize, X } from 'lucide-react';
 import { useStore } from '@/store/useStore';
 
+const TABS = ['Problems', 'Output', 'Terminal', 'Ports', 'Query Results'];
+
 export default function TerminalOutput() {
-  const { terminalLogs, isRunning } = useStore();
+  const { terminalLogs, isRunning, toggleTerminal } = useStore();
+  const [activeTab, setActiveTab] = useState('Terminal');
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -12,15 +15,42 @@ export default function TerminalOutput() {
 
   return (
     <div className="h-64 shrink-0 flex flex-col rounded-xl border border-[var(--color-border-primary)] bg-[var(--color-bg-panel)] overflow-hidden shadow-lg">
-      <div className="flex items-center justify-between border-b border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] px-4 py-3">
-        <div className="flex items-center gap-2">
-          <Terminal size={16} className="text-text-secondary" />
-          <span className="text-sm font-medium text-white">Output / Terminal</span>
+      <div className="flex items-center justify-between border-b border-[var(--color-border-primary)] bg-[#1e1e1e] px-4 py-2 select-none">
+        <div className="flex items-center gap-6">
+          {TABS.map(tab => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`text-xs font-medium uppercase tracking-wider transition-colors ${
+                activeTab === tab 
+                  ? 'text-white border-b border-brand-400 pb-1 -mb-1' 
+                  : 'text-text-tertiary hover:text-text-secondary pb-1 -mb-1 border-b border-transparent'
+              }`}
+            >
+              {tab}
+            </button>
+          ))}
         </div>
-        <div className="flex gap-2">
-          <div className="h-3 w-3 rounded-full bg-accent-red/20 border border-accent-red"></div>
-          <div className="h-3 w-3 rounded-full bg-accent-yellow/20 border border-accent-yellow"></div>
-          <div className="h-3 w-3 rounded-full bg-accent-green/20 border border-accent-green"></div>
+        <div className="flex items-center gap-3 text-text-tertiary">
+          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded hover:bg-white/5 cursor-pointer">
+            <Terminal size={14} className="text-brand-400" />
+            <span className="text-xs">powershell</span>
+          </div>
+          <div className="flex items-center gap-0.5 cursor-pointer hover:bg-white/5 rounded px-1">
+            <Plus size={14} />
+            <ChevronDown size={12} />
+          </div>
+          <AtSign size={14} className="cursor-pointer hover:text-white transition-colors" />
+          <Columns size={14} className="cursor-pointer hover:text-white transition-colors" />
+          <Trash2 size={14} className="cursor-pointer hover:text-white transition-colors" />
+          <MoreHorizontal size={14} className="cursor-pointer hover:text-white transition-colors" />
+          <div className="w-px h-4 bg-white/10 mx-1"></div>
+          <Maximize size={14} className="cursor-pointer hover:text-white transition-colors" />
+          <X 
+            size={14} 
+            className="cursor-pointer hover:text-white transition-colors" 
+            onClick={toggleTerminal} 
+          />
         </div>
       </div>
       <div className="flex-1 p-4 font-mono text-sm leading-relaxed text-text-secondary overflow-y-auto bg-black/20">

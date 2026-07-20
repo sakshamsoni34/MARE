@@ -50,6 +50,7 @@ export default function WorkflowVisualizer() {
           onConnect={onConnect}
           fitView
           colorMode="dark"
+          panActivationKeyCode={null}
         >
           <Background color="#3c3c3c" gap={16} />
           <Controls className="bg-[var(--color-bg-secondary)] border-[var(--color-border-primary)] fill-white text-white" />
