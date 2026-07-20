@@ -20,11 +20,11 @@ export default function Dashboard() {
     addTerminalLog('> Status: <span class="text-accent-yellow">INITIALIZING WORKFLOW...</span>');
     
     setTimeout(() => {
-      addTerminalLog('> <span class="text-text-secondary">Multi-Agent log:</span> Scraper connected to remote sources.');
+      addTerminalLog('> <span class="text-text-secondary">Multi-Agent log:</span> Researcher connected to remote sources.');
     }, 1500);
 
     setTimeout(() => {
-      addTerminalLog('> <span class="text-text-secondary">Multi-Agent log:</span> Cleanser active on dataset [market_data_v1]...');
+      addTerminalLog('> <span class="text-text-secondary">Multi-Agent log:</span> Data Analyst active on dataset [market_data_v1]...');
     }, 3000);
 
     setTimeout(() => {

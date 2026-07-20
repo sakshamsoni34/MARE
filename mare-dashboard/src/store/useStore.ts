@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { Node, Edge } from '@xyflow/react';
 
-export type Agent = 'Scraper' | 'Cleanser' | 'Research Agent' | 'Lead Developer' | 'Code Agent' | 'Reviewer';
+export type Agent = 'Orchestrator (Manager)' | 'Researcher' | 'Software Engineer' | 'Execution Sandbox' | 'Data Analyst' | 'Critic / QA' | 'Synthesizer' | 'Human Proxy';
 
 interface StoreState {
   // State
@@ -33,8 +33,8 @@ rf_model = RandomForestClassifier()
 rf_model.fit(X_train, y_train)`;
 
 const initialNodes: Node[] = [
-  { id: '1', position: { x: 0, y: 100 }, data: { label: 'Scraper' }, type: 'default' },
-  { id: '2', position: { x: 250, y: 100 }, data: { label: 'Cleanser' }, type: 'default' },
+  { id: '1', position: { x: 0, y: 100 }, data: { label: 'Researcher' }, type: 'default' },
+  { id: '2', position: { x: 250, y: 100 }, data: { label: 'Data Analyst' }, type: 'default' },
 ];
 
 const initialEdges: Edge[] = [
@@ -43,7 +43,7 @@ const initialEdges: Edge[] = [
 
 export const useStore = create<StoreState>((set) => ({
   activeProject: 'Market Analysis',
-  activeAgent: 'Code Agent',
+  activeAgent: 'Orchestrator (Manager)',
   terminalLogs: [
     '> Status: IDLE...',
     '> Multi-Agent system ready for deployment.'

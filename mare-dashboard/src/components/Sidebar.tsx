@@ -1,5 +1,5 @@
 import React from 'react';
-import { Folder, Play, Settings, Database, BookOpen, BrainCircuit, Code, Eye, Pause, Plus, Activity } from 'lucide-react';
+import { Folder, Play, Settings, Database, BookOpen, BrainCircuit, Code, Eye, Pause, Plus, Activity, User, Box, ShieldCheck, Zap } from 'lucide-react';
 import { useStore, Agent } from '@/store/useStore';
 
 export default function Sidebar() {
@@ -7,12 +7,14 @@ export default function Sidebar() {
 
   const projects = ['Market Analysis', 'Fraud Detection'];
   const agents: { name: Agent, icon: React.ReactNode, statusIcon: React.ReactNode }[] = [
-    { name: 'Scraper', icon: <Database size={18} />, statusIcon: <Play size={14} className="text-accent-green" /> },
-    { name: 'Cleanser', icon: <Settings size={18} />, statusIcon: <Activity size={14} className="text-brand-400" /> },
-    { name: 'Research Agent', icon: <BookOpen size={18} />, statusIcon: <Play size={14} className="text-text-tertiary group-hover:text-white transition-colors" /> },
-    { name: 'Lead Developer', icon: <BrainCircuit size={18} />, statusIcon: <Pause size={14} className="text-accent-yellow" /> },
-    { name: 'Code Agent', icon: <Code size={18} />, statusIcon: <Play size={14} className="text-text-tertiary group-hover:text-white transition-colors" /> },
-    { name: 'Reviewer', icon: <Eye size={18} />, statusIcon: <Play size={14} className="text-text-tertiary group-hover:text-white transition-colors" /> },
+    { name: 'Orchestrator (Manager)', icon: <BrainCircuit size={18} />, statusIcon: <Play size={14} className="text-accent-green" /> },
+    { name: 'Researcher', icon: <BookOpen size={18} />, statusIcon: <Activity size={14} className="text-brand-400" /> },
+    { name: 'Software Engineer', icon: <Code size={18} />, statusIcon: <Play size={14} className="text-text-tertiary group-hover:text-white transition-colors" /> },
+    { name: 'Execution Sandbox', icon: <Box size={18} />, statusIcon: <Pause size={14} className="text-accent-yellow" /> },
+    { name: 'Data Analyst', icon: <Database size={18} />, statusIcon: <Play size={14} className="text-text-tertiary group-hover:text-white transition-colors" /> },
+    { name: 'Critic / QA', icon: <ShieldCheck size={18} />, statusIcon: <Play size={14} className="text-text-tertiary group-hover:text-white transition-colors" /> },
+    { name: 'Synthesizer', icon: <Zap size={18} />, statusIcon: <Play size={14} className="text-text-tertiary group-hover:text-white transition-colors" /> },
+    { name: 'Human Proxy', icon: <User size={18} />, statusIcon: <Play size={14} className="text-text-tertiary group-hover:text-white transition-colors" /> },
   ];
 
   return (
