@@ -5,9 +5,11 @@ import { useStore } from '@/store/useStore';
 const TABS = ['Problems', 'Output', 'Terminal', 'Ports', 'Query Results'];
 
 export default function TerminalOutput() {
-  const { terminalLogs, isRunning, toggleTerminal } = useStore();
+  const { terminalLogs, runningAgents, toggleTerminal, clearTerminalLogs, addTerminalLog } = useStore();
   const [activeTab, setActiveTab] = useState('Terminal');
   const bottomRef = useRef<HTMLDivElement>(null);
+  
+  const isAnyAgentRunning = Object.values(runningAgents || {}).some(Boolean);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -42,7 +44,11 @@ export default function TerminalOutput() {
           </div>
           <AtSign size={14} className="cursor-pointer hover:text-white transition-colors" />
           <Columns size={14} className="cursor-pointer hover:text-white transition-colors" />
-          <Trash2 size={14} className="cursor-pointer hover:text-white transition-colors" />
+          <Trash2 
+            size={14} 
+            className="cursor-pointer hover:text-white transition-colors" 
+            onClick={clearTerminalLogs}
+          />
           <MoreHorizontal size={14} className="cursor-pointer hover:text-white transition-colors" />
           <div className="w-px h-4 bg-white/10 mx-1"></div>
           <Maximize size={14} className="cursor-pointer hover:text-white transition-colors" />
@@ -53,19 +59,40 @@ export default function TerminalOutput() {
           />
         </div>
       </div>
-      <div className="flex-1 p-4 font-mono text-sm leading-relaxed text-text-secondary overflow-y-auto bg-black/20">
+      <div className="flex-1 p-4 font-mono text-sm leading-relaxed text-text-secondary overflow-y-auto bg-black/20" onClick={() => document.getElementById('terminal-input')?.focus()}>
         {terminalLogs.map((log, index) => (
-          <div key={index} className="mt-1">
-            <span className="text-brand-400 mr-2">{'>'}</span>
-            <span dangerouslySetInnerHTML={{ __html: log }} />
+          <div key={index} className="mt-1 flex">
+            <span className="text-brand-400 mr-2 shrink-0">{'>'}</span>
+            <span className="break-all" dangerouslySetInnerHTML={{ __html: log }} />
           </div>
         ))}
-        {isRunning && (
-          <div className="mt-1 animate-pulse">
-            <span className="text-brand-400 mr-2">{'>'}</span>
+        {isAnyAgentRunning && (
+          <div className="mt-1 animate-pulse flex">
+            <span className="text-brand-400 mr-2 shrink-0">{'>'}</span>
             <span className="text-text-tertiary">_</span>
           </div>
         )}
+        <div className="mt-1 flex items-center">
+          <span className="text-brand-400 mr-2 shrink-0">{'>'}</span>
+          <input 
+            id="terminal-input"
+            type="text" 
+            className="flex-1 bg-transparent outline-none text-white placeholder:text-text-tertiary/50"
+            spellCheck={false}
+            autoComplete="off"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                const val = e.currentTarget.value.trim();
+                if (val.toLowerCase() === 'clear') {
+                  clearTerminalLogs();
+                } else if (val !== '') {
+                  addTerminalLog(`Command not found: ${val}`);
+                }
+                e.currentTarget.value = '';
+              }
+            }}
+          />
+        </div>
         <div ref={bottomRef} />
       </div>
     </div>
