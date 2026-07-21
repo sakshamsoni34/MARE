@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useEffect } from 'react';
-import { Play, Bell, Search, Activity, Cpu } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Play, Bell, Search, Activity, Cpu, Network } from 'lucide-react';
 import Sidebar from '@/components/Sidebar';
 import PropertiesPanel from '@/components/PropertiesPanel';
 import TerminalOutput from '@/components/TerminalOutput';
@@ -11,7 +11,12 @@ import MenuBar from '@/components/MenuBar';
 import { useStore } from '@/store/useStore';
 
 export default function Dashboard() {
-  const { isRunning, setIsRunning, addTerminalLog, clearTerminalLogs, isTerminalOpen } = useStore();
+  const { runningAgents, setAgentRunning, addTerminalLog, updateLastTerminalLog, clearTerminalLogs, isTerminalOpen, activeAgent, editorCode, updateAgentScript, isWorkflowOpen, toggleWorkflow, userQuery, setUserQuery } = useStore();
+  const [workflowWidth, setWorkflowWidth] = useState(500);
+
+  const currentAgent = activeAgent || 'Researcher Agent';
+  const isCurrentAgentRunning = runningAgents[currentAgent] || false;
+  const isAnyAgentRunning = Object.values(runningAgents).some(Boolean);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -24,29 +29,80 @@ export default function Dashboard() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  const handleStartResearch = () => {
-    if (isRunning) return;
+  const handleStartResearch = async () => {
+    const agentToRun = currentAgent;
+    if (runningAgents[agentToRun]) return;
     
-    setIsRunning(true);
+    setAgentRunning(agentToRun, true);
     clearTerminalLogs();
-    addTerminalLog('> Status: <span class="text-accent-yellow">INITIALIZING WORKFLOW...</span>');
     
-    setTimeout(() => {
-      addTerminalLog('> <span class="text-text-secondary">Multi-Agent log:</span> Researcher Agent connected to remote sources.');
-    }, 1500);
-
-    setTimeout(() => {
-      addTerminalLog('> <span class="text-text-secondary">Multi-Agent log:</span> Coder Agent active on codebase [mare_dashboard_v1]...');
-    }, 3000);
-
-    setTimeout(() => {
-      addTerminalLog('> <span class="text-accent-yellow">Warning:</span> Rate limit approaching for node "Data Enrichment"');
-    }, 4500);
+    if (!isTerminalOpen) {
+      useStore.getState().toggleTerminal();
+    }
     
-    setTimeout(() => {
-      addTerminalLog('> Status: <span class="text-accent-green">OPERATING NORMALLY</span>');
-      setIsRunning(false);
-    }, 6000);
+    addTerminalLog(`> Status: <span class="text-accent-yellow">INITIALIZING ${agentToRun.toUpperCase()}...</span>`);
+    
+    try {
+      const response = await fetch('http://localhost:8555/api/agent', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          agentName: agentToRun,
+          systemPrompt: useStore.getState().agentScripts[agentToRun] || 'You are a helpful AI assistant.',
+          userQuery: userQuery || 'Say hello',
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        addTerminalLog(`> <span class="text-accent-red">Error:</span> ${errorData.error || 'Failed to connect to agent.'}`);
+        setAgentRunning(agentToRun, false);
+        return;
+      }
+
+      addTerminalLog(`> <span class="text-accent-green">${agentToRun} connected. Task is executing...</span>`);
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      
+      let currentScriptCode = useStore.getState().agentScripts[agentToRun] || '';
+      currentScriptCode += `\n\n# --- ${agentToRun} Response ---\n\n`;
+      useStore.getState().updateAgentScript(agentToRun, currentScriptCode);
+      
+      while (reader) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        if (value) {
+          const chunkStr = decoder.decode(value, { stream: true });
+          const lines = chunkStr.split('\n').filter((line) => line.trim() !== '');
+          for (const line of lines) {
+            if (line.startsWith('data:')) {
+              const dataStr = line.replace(/^data:/, '').trim();
+              if (dataStr === '[DONE]') continue;
+              
+              try {
+                const parsed = JSON.parse(dataStr);
+                const content = parsed.choices?.[0]?.delta?.content;
+                if (content) {
+                  currentScriptCode += content;
+                  useStore.getState().updateAgentScript(agentToRun, currentScriptCode);
+                }
+              } catch (e) {
+                // ignore parse errors for partial lines
+              }
+            }
+          }
+        }
+      }
+      
+      addTerminalLog(`> Status: <span class="text-accent-green">${agentToRun.toUpperCase()} TASK COMPLETED</span>`);
+    } catch (error: any) {
+      addTerminalLog(`> <span class="text-accent-red">Error:</span> ${error.message}`);
+    } finally {
+      setAgentRunning(agentToRun, false);
+    }
   };
 
   return (
@@ -68,21 +124,37 @@ export default function Dashboard() {
           <Search size={18} className="text-text-tertiary" />
           <input 
             type="text" 
-            placeholder="Configure and launch your multi-agent workflow..." 
+            placeholder="Enter your query here..." 
+            value={userQuery}
+            onChange={(e) => setUserQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !isCurrentAgentRunning) {
+                handleStartResearch();
+              }
+            }}
             className="w-full bg-transparent text-sm outline-none placeholder:text-text-tertiary text-text-primary"
           />
         </div>
 
         <div className="flex items-center gap-6">
+          <button
+            onClick={toggleWorkflow}
+            className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all ${
+              isWorkflowOpen ? 'bg-brand-500/20 text-brand-400 border border-brand-500/50 shadow-inner' : 'bg-transparent text-text-secondary hover:bg-[var(--color-bg-panel)] hover:text-white border border-transparent'
+            }`}
+          >
+            <Network size={16} />
+            Workflow Config
+          </button>
           <button 
             onClick={handleStartResearch}
-            disabled={isRunning}
+            disabled={isCurrentAgentRunning}
             className={`flex items-center gap-2 rounded-lg px-5 py-2 text-sm font-medium text-white shadow-md transition-all ${
-              isRunning ? 'bg-brand-500/50 cursor-not-allowed' : 'bg-brand-600 hover:bg-brand-500 hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0'
+              isCurrentAgentRunning ? 'bg-brand-500/50 cursor-not-allowed' : 'bg-brand-600 hover:bg-brand-500 hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0'
             }`}
           >
             <Play size={16} fill="currentColor" />
-            {isRunning ? 'Running...' : 'Start Research'}
+            {isCurrentAgentRunning ? 'Running...' : 'Start Research'}
           </button>
         </div>
       </header>
@@ -93,9 +165,37 @@ export default function Dashboard() {
 
         {/* Center Area (Editor + Terminal) */}
         <main className="flex flex-1 flex-col overflow-hidden bg-[var(--color-bg-primary)] p-4 gap-4">
-          <div className="flex flex-1 gap-4 min-h-[50%]">
-            <CodeEditor />
-            <WorkflowVisualizer />
+          <div className="flex flex-1 min-h-[50%]">
+            <div className="flex-1 overflow-hidden flex">
+              <CodeEditor />
+            </div>
+            {isWorkflowOpen && (
+              <>
+                <div 
+                  className="w-1.5 cursor-col-resize hover:bg-brand-500/50 bg-transparent transition-colors mx-2 flex-shrink-0 z-10 rounded-full"
+                  onMouseDown={(e) => {
+                    const startX = e.clientX;
+                    const startWidth = workflowWidth;
+                    
+                    const onMouseMove = (moveEvent: MouseEvent) => {
+                      const newWidth = Math.max(300, Math.min(800, startWidth - (moveEvent.clientX - startX)));
+                      setWorkflowWidth(newWidth);
+                    };
+                    
+                    const onMouseUp = () => {
+                      document.removeEventListener('mousemove', onMouseMove);
+                      document.removeEventListener('mouseup', onMouseUp);
+                    };
+                    
+                    document.addEventListener('mousemove', onMouseMove);
+                    document.addEventListener('mouseup', onMouseUp);
+                  }}
+                />
+                <div style={{ width: workflowWidth }} className="flex flex-shrink-0">
+                  <WorkflowVisualizer />
+                </div>
+              </>
+            )}
           </div>
           {isTerminalOpen && <TerminalOutput />}
         </main>
@@ -114,7 +214,7 @@ export default function Dashboard() {
             <span>System Health:</span>
             <span className="text-accent-green flex items-center gap-1">
               <div className="h-2 w-2 rounded-full bg-accent-green shadow-[0_0_8px_var(--color-accent-green)]"></div>
-              {isRunning ? 'Processing...' : 'Excellent'}
+              {isAnyAgentRunning ? 'Processing...' : 'Excellent'}
             </span>
           </div>
         </div>
@@ -123,12 +223,12 @@ export default function Dashboard() {
           <div className="flex items-center gap-2">
             <Cpu size={14} className="text-text-secondary" />
             <span>CPU:</span>
-            <span className="text-white w-8 text-right font-mono">{isRunning ? '78%' : '34%'}</span>
+            <span className="text-white w-8 text-right font-mono">{isAnyAgentRunning ? '78%' : '34%'}</span>
           </div>
           <div className="flex items-center gap-2">
             <Activity size={14} className="text-text-secondary" />
             <span>Memory:</span>
-            <span className="text-white w-8 text-right font-mono">{isRunning ? '82%' : '63%'}</span>
+            <span className="text-white w-8 text-right font-mono">{isAnyAgentRunning ? '82%' : '63%'}</span>
           </div>
         </div>
       </footer>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Folder, Play, Settings, Database, BookOpen, BrainCircuit, Code, Eye, Pause, Plus, Activity, User, Box, ShieldCheck, Zap, X } from 'lucide-react';
 import { useStore, Agent } from '@/store/useStore';
 
@@ -6,6 +6,13 @@ export default function Sidebar() {
   const { activeProject, setActiveProject, activeAgent, setActiveAgent, projects, createNewProject, deleteProject } = useStore();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [projectToDelete, setProjectToDelete] = useState<string | null>(null);
+  const [contextMenuInfo, setContextMenuInfo] = useState<{x: number, y: number, projectName: string} | null>(null);
+
+  useEffect(() => {
+    const handleClick = () => setContextMenuInfo(null);
+    window.addEventListener('click', handleClick);
+    return () => window.removeEventListener('click', handleClick);
+  }, []);
   const [newProjectName, setNewProjectName] = useState('');
   const [newProjectDesc, setNewProjectDesc] = useState('');
   const [newProjectGoal, setNewProjectGoal] = useState('Data Analysis');
@@ -63,7 +70,7 @@ export default function Sidebar() {
                 onClick={() => setActiveProject(proj)}
                 onContextMenu={(e) => {
                   e.preventDefault();
-                  setProjectToDelete(proj);
+                  setContextMenuInfo({ x: e.pageX, y: e.pageY, projectName: proj });
                 }}
                 className={`flex cursor-pointer items-center gap-3 rounded-md px-3 py-2 transition-colors ${activeProject === proj ? 'bg-[var(--color-bg-tertiary)] text-brand-400' : 'text-text-primary hover:bg-[var(--color-bg-tertiary)]'}`}
               >
@@ -226,6 +233,24 @@ export default function Sidebar() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+      {/* Context Menu */}
+      {contextMenuInfo && (
+        <div 
+          className="fixed z-[100] w-40 rounded-md border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] shadow-xl py-1 overflow-hidden"
+          style={{ top: contextMenuInfo.y, left: contextMenuInfo.x }}
+        >
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setProjectToDelete(contextMenuInfo.projectName);
+              setContextMenuInfo(null);
+            }}
+            className="flex w-full items-center px-4 py-2 text-sm text-accent-red hover:bg-[var(--color-bg-tertiary)] transition-colors text-left font-medium"
+          >
+            Delete Project
+          </button>
         </div>
       )}
     </aside>
