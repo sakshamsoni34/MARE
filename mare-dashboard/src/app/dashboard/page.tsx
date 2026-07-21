@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { Play, Bell, Search, Activity, Cpu, Network, ChevronDown } from 'lucide-react';
-import Sidebar from '@/components/Sidebar';
+import Explorer from '@/components/Explorer';
 import PropertiesPanel from '@/components/PropertiesPanel';
 import TerminalOutput from '@/components/TerminalOutput';
 import CodeEditor from '@/components/CodeEditor';
@@ -132,10 +132,10 @@ export default function Dashboard() {
           <div className="relative">
             <button 
               onClick={() => setIsAgentDropdownOpen(!isAgentDropdownOpen)}
-              className="flex items-center gap-2 rounded-lg border border-[var(--color-border-secondary)] bg-[var(--color-bg-primary)] px-4 py-2 text-sm text-text-primary hover:border-brand-500/50 transition-colors shadow-inner"
+              className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-text-secondary hover:bg-[var(--color-bg-panel)] hover:text-white transition-all group"
             >
               <span>Agents</span>
-              <ChevronDown size={14} className="text-text-tertiary" />
+              <ChevronDown size={14} className="text-text-tertiary group-hover:text-white transition-colors" />
             </button>
             
             {isAgentDropdownOpen && (
@@ -186,9 +186,7 @@ export default function Dashboard() {
 
       {/* Main Content Area */}
       <div className="flex flex-1 overflow-hidden">
-        <Sidebar />
-
-        {/* Center Area (Editor + Terminal) */}
+        <Explorer />
         <main className="flex flex-1 flex-col overflow-hidden bg-[var(--color-bg-primary)] p-4 gap-4">
           <div className="flex flex-1 min-h-[50%]">
             <div className="flex-1 overflow-x-auto overflow-y-hidden flex pb-2 custom-scrollbar">

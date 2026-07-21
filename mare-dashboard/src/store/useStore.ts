@@ -4,6 +4,14 @@ import { Node, Edge } from '@xyflow/react';
 
 export type Agent = 'Researcher Agent' | 'Coder Agent' | 'Planner Agent' | 'Executor Agent' | 'Reviewer Agent' | 'Designer Agent' | 'Tester Agent';
 
+export type FileSystemNode = {
+  id: string;
+  name: string;
+  type: 'file' | 'folder';
+  children?: FileSystemNode[];
+  isOpen?: boolean;
+};
+
 interface StoreState {
   // State
   projects: string[];
@@ -19,6 +27,7 @@ interface StoreState {
   isTerminalOpen: boolean;
   isWorkflowOpen: boolean;
   userQuery: string;
+  fileSystem: FileSystemNode[];
 
   // Actions
   setActiveProject: (project: string) => void;
@@ -38,12 +47,29 @@ interface StoreState {
   setUserQuery: (query: string) => void;
   createNewProject: (name: string, description?: string, goal?: string, source?: string, priority?: string) => void;
   deleteProject: (name: string) => void;
+  createFile: (parentId: string | null, name: string) => void;
+  createFolder: (parentId: string | null, name: string) => void;
+  renameNode: (id: string, newName: string) => void;
+  deleteNode: (id: string) => void;
+  toggleFolder: (id: string) => void;
+  expandFolder: (id: string) => void;
+  collapseAllFolders: () => void;
+  setFileSystem: (nodes: FileSystemNode[]) => void;
 }
 
 const initialCode = `# No active project selected.\\n# Create a new research project to begin.\\n`;
 
 const initialNodes: Node[] = [];
 const initialEdges: Edge[] = [];
+const initialFileSystem: FileSystemNode[] = [
+  {
+    id: 'root-1',
+    name: 'mare-dashboard',
+    type: 'folder',
+    isOpen: true,
+    children: []
+  }
+];
 
 export const useStore = create<StoreState>()(
   persist(
@@ -64,6 +90,7 @@ export const useStore = create<StoreState>()(
       isTerminalOpen: false,
       isWorkflowOpen: false,
       userQuery: '',
+      fileSystem: initialFileSystem,
 
       setActiveProject: (project) => set({ activeProject: project }),
       setActiveAgent: (agent) => set((state) => {
@@ -167,6 +194,123 @@ export const useStore = create<StoreState>()(
           terminalLogs: [...state.terminalLogs, `> Project "${name}" deleted.`]
         };
       }),
+      createFile: (parentId, name) => set((state) => {
+        const newNode: FileSystemNode = { id: Date.now().toString(), name, type: 'file' };
+        
+        if (!parentId) {
+          if (state.fileSystem.length > 0 && state.fileSystem[0].type === 'folder') {
+            const newFileSystem = [...state.fileSystem];
+            newFileSystem[0] = { ...newFileSystem[0], children: [...(newFileSystem[0].children || []), newNode], isOpen: true };
+            return { fileSystem: newFileSystem };
+          }
+          return { fileSystem: [...state.fileSystem, newNode] };
+        }
+        
+        const addNodeToParent = (nodes: FileSystemNode[]): FileSystemNode[] => {
+          return nodes.map(node => {
+            if (node.id === parentId && node.type === 'folder') {
+              return { ...node, children: [...(node.children || []), newNode], isOpen: true };
+            }
+            if (node.children) {
+              return { ...node, children: addNodeToParent(node.children) };
+            }
+            return node;
+          });
+        };
+        
+        return { fileSystem: addNodeToParent(state.fileSystem) };
+      }),
+      createFolder: (parentId, name) => set((state) => {
+        const newNode: FileSystemNode = { id: Date.now().toString(), name, type: 'folder', isOpen: false, children: [] };
+        
+        if (!parentId) {
+          if (state.fileSystem.length > 0 && state.fileSystem[0].type === 'folder') {
+            const newFileSystem = [...state.fileSystem];
+            newFileSystem[0] = { ...newFileSystem[0], children: [...(newFileSystem[0].children || []), newNode], isOpen: true };
+            return { fileSystem: newFileSystem };
+          }
+          return { fileSystem: [...state.fileSystem, newNode] };
+        }
+        
+        const addNodeToParent = (nodes: FileSystemNode[]): FileSystemNode[] => {
+          return nodes.map(node => {
+            if (node.id === parentId && node.type === 'folder') {
+              return { ...node, children: [...(node.children || []), newNode], isOpen: true };
+            }
+            if (node.children) {
+              return { ...node, children: addNodeToParent(node.children) };
+            }
+            return node;
+          });
+        };
+        
+        return { fileSystem: addNodeToParent(state.fileSystem) };
+      }),
+      renameNode: (id, newName) => set((state) => {
+        const renameInNodes = (nodes: FileSystemNode[]): FileSystemNode[] => {
+          return nodes.map(node => {
+            if (node.id === id) {
+              return { ...node, name: newName };
+            }
+            if (node.children) {
+              return { ...node, children: renameInNodes(node.children) };
+            }
+            return node;
+          });
+        };
+        return { fileSystem: renameInNodes(state.fileSystem) };
+      }),
+      deleteNode: (id) => set((state) => {
+        const deleteFromNodes = (nodes: FileSystemNode[]): FileSystemNode[] => {
+          return nodes.filter(node => node.id !== id).map(node => {
+            if (node.children) {
+              return { ...node, children: deleteFromNodes(node.children) };
+            }
+            return node;
+          });
+        };
+        return { fileSystem: deleteFromNodes(state.fileSystem) };
+      }),
+      toggleFolder: (id) => set((state) => {
+        const toggleNode = (nodes: FileSystemNode[]): FileSystemNode[] => {
+          return nodes.map(node => {
+            if (node.id === id && node.type === 'folder') {
+              return { ...node, isOpen: !node.isOpen };
+            }
+            if (node.children) {
+              return { ...node, children: toggleNode(node.children) };
+            }
+            return node;
+          });
+        };
+        return { fileSystem: toggleNode(state.fileSystem) };
+      }),
+      expandFolder: (id) => set((state) => {
+        const expandNode = (nodes: FileSystemNode[]): FileSystemNode[] => {
+          return nodes.map(node => {
+            if (node.id === id && node.type === 'folder') {
+              return { ...node, isOpen: true };
+            }
+            if (node.children) {
+              return { ...node, children: expandNode(node.children) };
+            }
+            return node;
+          });
+        };
+        return { fileSystem: expandNode(state.fileSystem) };
+      }),
+      collapseAllFolders: () => set((state) => {
+        const collapseNodes = (nodes: FileSystemNode[]): FileSystemNode[] => {
+          return nodes.map(node => {
+            if (node.type === 'folder') {
+              return { ...node, isOpen: false, children: node.children ? collapseNodes(node.children) : [] };
+            }
+            return node;
+          });
+        };
+        return { fileSystem: collapseNodes(state.fileSystem) };
+      }),
+      setFileSystem: (nodes) => set({ fileSystem: nodes }),
     }),
     {
       name: 'mare-store',

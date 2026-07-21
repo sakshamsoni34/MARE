@@ -63,12 +63,54 @@ export default function MenuBar({ onNewFile, onNewFolder }: MenuBarProps) {
     }
   };
 
+  const readDirectory = async (dirHandle: any, parentId: string = ''): Promise<any[]> => {
+    const nodes = [];
+    for await (const entry of dirHandle.values()) {
+      // Skip heavy/hidden folders to avoid hanging
+      if (entry.name === 'node_modules' || entry.name === '.git' || entry.name === '.next') continue;
+      
+      const id = parentId ? `${parentId}/${entry.name}` : entry.name;
+      
+      if (entry.kind === 'directory') {
+        nodes.push({
+          id,
+          name: entry.name,
+          type: 'folder',
+          isOpen: false,
+          children: await readDirectory(entry, id)
+        });
+      } else {
+        nodes.push({
+          id,
+          name: entry.name,
+          type: 'file'
+        });
+      }
+    }
+    // Sort: folders first, then files, alphabetically
+    return nodes.sort((a, b) => {
+      if (a.type !== b.type) return a.type === 'folder' ? -1 : 1;
+      return a.name.localeCompare(b.name);
+    });
+  };
+
   const handleOpenFolder = async () => {
     try {
       const dirHandle = await (window as any).showDirectoryPicker();
-      addTerminalLog(`> <span class="text-accent-green">Success:</span> Opened folder [${dirHandle.name}]`);
-    } catch (err) {
-      addTerminalLog(`> <span class="text-accent-red">Error:</span> Failed to open folder`);
+      
+      const rootNode = {
+        id: 'root-1',
+        name: dirHandle.name,
+        type: 'folder' as const,
+        isOpen: true,
+        children: await readDirectory(dirHandle)
+      };
+      
+      useStore.getState().setFileSystem([rootNode]);
+      addTerminalLog(`> <span class="text-accent-green">Success:</span> Loaded folder [${dirHandle.name}] and its contents.`);
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === 'AbortError') return;
+      addTerminalLog(`> <span class="text-accent-red">Error:</span> Failed to open folder: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
 
