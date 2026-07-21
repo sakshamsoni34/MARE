@@ -31,14 +31,13 @@ export default function Sidebar() {
   };
 
   const agents: { name: Agent, icon: React.ReactNode, statusIcon: React.ReactNode }[] = [
-    { name: 'Orchestrator (Manager)', icon: <BrainCircuit size={18} />, statusIcon: <Play size={14} className="text-accent-green" /> },
-    { name: 'Researcher', icon: <BookOpen size={18} />, statusIcon: <Activity size={14} className="text-brand-400" /> },
-    { name: 'Software Engineer', icon: <Code size={18} />, statusIcon: <Play size={14} className="text-text-tertiary group-hover:text-white transition-colors" /> },
-    { name: 'Execution Sandbox', icon: <Box size={18} />, statusIcon: <Pause size={14} className="text-accent-yellow" /> },
-    { name: 'Data Analyst', icon: <Database size={18} />, statusIcon: <Play size={14} className="text-text-tertiary group-hover:text-white transition-colors" /> },
-    { name: 'Critic / QA', icon: <ShieldCheck size={18} />, statusIcon: <Play size={14} className="text-text-tertiary group-hover:text-white transition-colors" /> },
-    { name: 'Synthesizer', icon: <Zap size={18} />, statusIcon: <Play size={14} className="text-text-tertiary group-hover:text-white transition-colors" /> },
-    { name: 'Human Proxy', icon: <User size={18} />, statusIcon: <Play size={14} className="text-text-tertiary group-hover:text-white transition-colors" /> },
+    { name: 'Researcher Agent', icon: <BookOpen size={18} />, statusIcon: <Activity size={14} className="text-brand-400" /> },
+    { name: 'Coder Agent', icon: <Code size={18} />, statusIcon: <Play size={14} className="text-text-tertiary group-hover:text-white transition-colors" /> },
+    { name: 'Planner Agent', icon: <BrainCircuit size={18} />, statusIcon: <Play size={14} className="text-accent-green" /> },
+    { name: 'Executor Agent', icon: <Box size={18} />, statusIcon: <Pause size={14} className="text-accent-yellow" /> },
+    { name: 'Reviewer Agent', icon: <ShieldCheck size={18} />, statusIcon: <Play size={14} className="text-text-tertiary group-hover:text-white transition-colors" /> },
+    { name: 'Designer Agent', icon: <Eye size={18} />, statusIcon: <Play size={14} className="text-text-tertiary group-hover:text-white transition-colors" /> },
+    { name: 'Tester Agent', icon: <Activity size={18} />, statusIcon: <Play size={14} className="text-text-tertiary group-hover:text-white transition-colors" /> },
   ];
 
   return (

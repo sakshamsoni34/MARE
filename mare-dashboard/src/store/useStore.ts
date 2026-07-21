@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { Node, Edge } from '@xyflow/react';
 
-export type Agent = 'Orchestrator (Manager)' | 'Researcher' | 'Software Engineer' | 'Execution Sandbox' | 'Data Analyst' | 'Critic / QA' | 'Synthesizer' | 'Human Proxy';
+export type Agent = 'Researcher Agent' | 'Coder Agent' | 'Planner Agent' | 'Executor Agent' | 'Reviewer Agent' | 'Designer Agent' | 'Tester Agent';
 
 interface StoreState {
   // State
@@ -37,7 +37,7 @@ const initialEdges: Edge[] = [];
 export const useStore = create<StoreState>((set) => ({
   projects: [],
   activeProject: '',
-  activeAgent: 'Orchestrator (Manager)',
+  activeAgent: 'Researcher Agent',
   terminalLogs: [
     '> Status: IDLE...',
     '> System ready. Create a new research project to deploy agents.'
