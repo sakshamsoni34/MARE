@@ -54,7 +54,7 @@ export default function Sidebar() {
           onClick={() => setIsModalOpen(true)}
           className="flex w-full items-center justify-center gap-2 rounded-lg border border-[var(--color-border-secondary)] bg-[var(--color-bg-primary)] py-2.5 text-sm font-medium text-text-secondary hover:bg-[var(--color-bg-tertiary)] hover:border-brand-500/50 hover:text-white transition-all shadow-sm"
         >
-          <Plus size={16} /> NEW RESEARCH
+          <Plus size={16} /> New Project
         </button>
       </div>
 
@@ -81,26 +81,7 @@ export default function Sidebar() {
           </div>
         </div>
 
-        <div className="mb-6">
-          <div className="flex items-center gap-2 px-3 py-2 text-sm font-semibold tracking-wider text-text-secondary uppercase">
-            <span>Agents</span>
-          </div>
-          <div className="mt-2 flex flex-col gap-1.5">
-            {agents.map((agent) => (
-              <div
-                key={agent.name}
-                onClick={() => setActiveAgent(agent.name)}
-                className={`flex items-center justify-between group cursor-pointer rounded-md px-3 py-2 transition-colors ${activeAgent === agent.name ? 'bg-brand-500/10 border border-brand-500/20 text-brand-300' : 'hover:bg-[var(--color-bg-tertiary)]'}`}
-              >
-                <div className={`flex items-center gap-3 transition-colors ${activeAgent === agent.name ? 'text-brand-300' : 'text-text-secondary group-hover:text-white'}`}>
-                  {agent.icon}
-                  <span className="text-sm">{agent.name}</span>
-                </div>
-                {agent.statusIcon}
-              </div>
-            ))}
-          </div>
-        </div>
+
       </div>
 
       {/* New Research Modal */}

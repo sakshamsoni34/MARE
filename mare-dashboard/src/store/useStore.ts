@@ -9,6 +9,7 @@ interface StoreState {
   projects: string[];
   activeProject: string;
   activeAgent: Agent | null;
+  openAgents: Agent[];
   terminalLogs: string[];
   editorCode: string;
   agentScripts: Record<string, string>;
@@ -22,6 +23,8 @@ interface StoreState {
   // Actions
   setActiveProject: (project: string) => void;
   setActiveAgent: (agent: Agent) => void;
+  addOpenAgent: (agent: Agent) => void;
+  removeOpenAgent: (agent: Agent) => void;
   addTerminalLog: (log: string) => void;
   updateLastTerminalLog: (log: string) => void;
   clearTerminalLogs: () => void;
@@ -48,6 +51,7 @@ export const useStore = create<StoreState>()(
       projects: [],
       activeProject: '',
       activeAgent: 'Researcher Agent',
+      openAgents: ['Researcher Agent'],
       terminalLogs: [
         '> Status: IDLE...',
         '> System ready. Create a new research project to deploy agents.'
@@ -77,6 +81,26 @@ export const useStore = create<StoreState>()(
           agentScripts: newScripts,
           editorCode: newCode
         };
+      }),
+      addOpenAgent: (agent) => set((state) => {
+        if (state.openAgents.includes(agent)) return { activeAgent: agent };
+        const currentScript = state.agentScripts[agent];
+        const newState: Partial<StoreState> = { 
+          openAgents: [...state.openAgents, agent],
+          activeAgent: agent
+        };
+        if (!currentScript) {
+          newState.agentScripts = { ...state.agentScripts, [agent]: `# ${agent} Script\n\n# Write your ${agent.toLowerCase()} prompt here...\n` };
+        }
+        return newState;
+      }),
+      removeOpenAgent: (agent) => set((state) => {
+        const newOpenAgents = state.openAgents.filter(a => a !== agent);
+        const newState: Partial<StoreState> = { openAgents: newOpenAgents };
+        if (state.activeAgent === agent && newOpenAgents.length > 0) {
+          newState.activeAgent = newOpenAgents[newOpenAgents.length - 1];
+        }
+        return newState;
       }),
       addTerminalLog: (log) => set((state) => ({ terminalLogs: [...state.terminalLogs, log] })),
       updateLastTerminalLog: (log) => set((state) => {
@@ -150,7 +174,8 @@ export const useStore = create<StoreState>()(
         projects: state.projects,
         activeProject: state.activeProject,
         agentScripts: state.agentScripts,
-        editorCode: state.editorCode
+        editorCode: state.editorCode,
+        openAgents: state.openAgents
       })
     }
   )
