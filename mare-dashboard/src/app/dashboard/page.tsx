@@ -22,7 +22,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.ctrlKey && (e.key === '`' || e.key === '~')) {
+      if (e.ctrlKey && (e.key === '`' || e.key === '~' || e.code === 'Backquote')) {
         e.preventDefault();
         useStore.getState().toggleTerminal();
       }
@@ -36,10 +36,6 @@ export default function Dashboard() {
     if (agentsToRun.length === 0) return;
     
     clearTerminalLogs();
-    
-    if (!isTerminalOpen) {
-      useStore.getState().toggleTerminal();
-    }
     
     const runPromises = agentsToRun.map(async (agentToRun) => {
       setAgentRunning(agentToRun, true);
@@ -253,8 +249,6 @@ export default function Dashboard() {
           </div>
           {isTerminalOpen && <TerminalOutput />}
         </main>
-
-        <PropertiesPanel />
       </div>
 
       {/* Bottom Status Bar */}
