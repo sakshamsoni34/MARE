@@ -14,8 +14,7 @@ import {
 import { useStore, FileSystemNode } from '@/store/useStore';
 
 export default function Explorer() {
-  const { fileSystem, createFile, createFolder, toggleFolder, expandFolder, collapseAllFolders, renameNode, deleteNode } = useStore();
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const { fileSystem, createFile, createFolder, toggleFolder, expandFolder, collapseAllFolders, renameNode, deleteNode, selectedFolderId, setSelectedFolderId } = useStore();
   const [contextMenuInfo, setContextMenuInfo] = useState<{ x: number, y: number, nodeId: string } | null>(null);
   const [creatingItem, setCreatingItem] = useState<{ type: 'file' | 'folder', parentId: string | null } | null>(null);
 
@@ -26,8 +25,8 @@ export default function Explorer() {
   }, []);
 
   const handleNewItem = (type: 'file' | 'folder') => {
-    if (selectedNodeId) expandFolder(selectedNodeId);
-    setCreatingItem({ type, parentId: selectedNodeId });
+    if (selectedFolderId) expandFolder(selectedFolderId);
+    setCreatingItem({ type, parentId: selectedFolderId });
   };
 
   const handleNewFile = () => handleNewItem('file');
@@ -36,7 +35,7 @@ export default function Explorer() {
   const handleRefresh = () => {
     // For now, this just re-renders since we don't have a real backend to fetch from.
     // In a real app, you'd fetch the file system from the server here.
-    setSelectedNodeId(null);
+    setSelectedFolderId(null);
   };
 
   const renderInput = (parentId: string | null, depth: number) => {
@@ -69,7 +68,7 @@ export default function Explorer() {
   };
 
   const renderNode = (node: FileSystemNode, depth: number = 0) => {
-    const isSelected = selectedNodeId === node.id;
+    const isSelected = selectedFolderId === node.id;
     const isFolder = node.type === 'folder';
 
     return (
@@ -80,7 +79,7 @@ export default function Explorer() {
           style={{ paddingLeft: `${depth * 12 + 8}px` }}
           onClick={(e) => {
             e.stopPropagation();
-            setSelectedNodeId(node.id);
+            setSelectedFolderId(node.id);
             if (isFolder) {
               toggleFolder(node.id);
             }
@@ -88,7 +87,7 @@ export default function Explorer() {
           onContextMenu={(e) => {
             e.preventDefault();
             e.stopPropagation();
-            setSelectedNodeId(node.id);
+            setSelectedFolderId(node.id);
             setContextMenuInfo({ x: e.pageX, y: e.pageY, nodeId: node.id });
           }}
         >
@@ -118,14 +117,9 @@ export default function Explorer() {
 
   return (
     <aside className="w-64 shrink-0 border-r border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] flex flex-col h-full select-none">
-      <div className="p-3 pb-2 text-xs font-medium text-text-tertiary uppercase tracking-wider">
-        Explorer
-      </div>
-      
-      <div className="flex items-center justify-between px-3 py-1 mb-2 group">
-        <div className="flex items-center gap-1 text-xs font-semibold text-text-secondary uppercase truncate pr-2">
-          <ChevronDown size={14} className="shrink-0" />
-          <span className="truncate">{fileSystem[0]?.name || 'PROJECT'}</span>
+      <div className="flex items-center justify-between p-3 pb-2 group">
+        <div className="text-xs font-medium text-text-tertiary uppercase tracking-wider">
+          Explorer
         </div>
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
           <button onClick={handleNewFile} className="p-1 hover:bg-[var(--color-bg-tertiary)] rounded text-text-tertiary hover:text-text-primary transition-colors" title="New File">
@@ -148,12 +142,12 @@ export default function Explorer() {
         onClick={(e) => {
           // If clicked in the empty space, deselect the node
           if (e.target === e.currentTarget) {
-            setSelectedNodeId(null);
+            setSelectedFolderId(null);
           }
         }}
       >
         {renderInput(null, 0)}
-        {(fileSystem[0]?.children || fileSystem).map(node => renderNode(node, 0))}
+        {fileSystem.map(node => renderNode(node, 0))}
       </div>
 
       {contextMenuInfo && (
@@ -179,8 +173,8 @@ export default function Explorer() {
             onClick={(e) => {
               e.stopPropagation();
               deleteNode(contextMenuInfo.nodeId);
-              if (selectedNodeId === contextMenuInfo.nodeId) {
-                setSelectedNodeId(null);
+              if (selectedFolderId === contextMenuInfo.nodeId) {
+                setSelectedFolderId(null);
               }
               setContextMenuInfo(null);
             }}

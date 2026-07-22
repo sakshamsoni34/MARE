@@ -295,28 +295,6 @@ export default function MenuBar({ onNewFile, onNewFolder }: MenuBarProps) {
         {renderDropdown()}
       </div>
 
-      <div className="flex items-center h-full gap-2 pr-2">
-        <div className="flex items-center gap-1.5 mr-2">
-          <button className="flex items-center justify-center w-7 h-7 rounded hover:bg-[#313232] transition-colors">
-            <PanelRight size={15} />
-          </button>
-          
-          <div className="w-px h-4 bg-[#454545] mx-1"></div>
-          
-          <button 
-            className={`flex items-center justify-center w-7 h-7 rounded transition-colors ${activeMenu === 'Settings' ? 'bg-[#313232] text-white' : 'hover:bg-[#313232]'}`}
-            onClick={() => setActiveMenu(activeMenu === 'Settings' ? null : 'Settings')}
-          >
-            <Settings size={15} />
-          </button>
-          <button 
-            className={`flex items-center justify-center w-7 h-7 rounded transition-colors ${activeMenu === 'Profile' ? 'bg-[#313232] text-white' : 'hover:bg-[#313232]'}`}
-            onClick={() => setActiveMenu(activeMenu === 'Profile' ? null : 'Profile')}
-          >
-            <UserCircle size={15} />
-          </button>
-        </div>
-      </div>
     </div>
   );
 }

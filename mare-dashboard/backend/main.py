@@ -12,13 +12,13 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-def get_system_prompt(agent_name: str) -> str:
+def get_base_prompt(agent_name: str) -> str:
     prompts = {
         'Researcher Agent': 'You are an expert Researcher Agent. Your sole purpose is to conduct deep research, gather information, and synthesize complex topics into easy-to-understand reports. Only provide factual, researched information.',
         'Coder Agent': 'You are an expert Coder Agent. Your sole purpose is to write clean, efficient, and well-documented code. Focus only on coding and architectural decisions. Provide code blocks when appropriate.',
@@ -30,6 +30,21 @@ def get_system_prompt(agent_name: str) -> str:
     }
     return prompts.get(agent_name, 'You are a helpful AI assistant in the MARE multi-agent system.')
 
+workflow_instruction = '''
+If the user asks for a workflow or diagram, you must provide it using a JSON block formatted exactly like this:
+```json
+{
+  "workflow": {
+    "nodes": [
+      { "id": "1", "position": { "x": 100, "y": 100 }, "data": { "label": "Node 1" }, "type": "default" }
+    ],
+    "edges": [
+      { "id": "e1-2", "source": "1", "target": "2", "animated": true }
+    ]
+  }
+}
+```
+'''
 
 @app.post("/api/agent")
 async def handle_agent_request(request: Request):
@@ -45,7 +60,8 @@ async def handle_agent_request(request: Request):
     if not user_query:
         raise HTTPException(status_code=400, detail="User query is required")
 
-    system_prompt = system_prompt_from_ui if system_prompt_from_ui else get_system_prompt(agent_name)
+    base_prompt = system_prompt_from_ui if system_prompt_from_ui else get_base_prompt(agent_name)
+    system_prompt = base_prompt + "\n" + workflow_instruction
     
     mistral_payload = {
         "model": "mistral-large-latest",

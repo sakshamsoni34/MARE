@@ -77,6 +77,24 @@ export default function CodeEditor({ agent }: CodeEditorProps) {
           }
         }
       }
+      
+      const jsonBlocks = [...currentScriptCode.matchAll(/```json\s*([\s\S]*?)\s*```/g)];
+      for (const match of jsonBlocks) {
+        try {
+          const parsed = JSON.parse(match[1]);
+          if (parsed.workflow && parsed.workflow.nodes && parsed.workflow.edges) {
+            useStore.getState().setWorkflowNodes(parsed.workflow.nodes);
+            useStore.getState().setWorkflowEdges(parsed.workflow.edges);
+            useStore.getState().setWorkflowOpen(true);
+            addTerminalLog(`> Status: <span class="text-accent-blue">Generated workflow from response.</span>`);
+            
+            currentScriptCode = currentScriptCode.replace(match[0], '\n> *[Workflow configuration extracted and rendered in the Multi-Agent Workflow panel]*\n');
+            updateAgentScript(agent, currentScriptCode);
+            break;
+          }
+        } catch (e) {}
+      }
+      
       addTerminalLog(`> Status: <span class="text-accent-green">${agent.toUpperCase()} TASK COMPLETED</span>`);
     } catch (error: any) {
       addTerminalLog(`> <span class="text-accent-red">Error (${agent}):</span> ${error.message}`);

@@ -28,6 +28,7 @@ interface StoreState {
   isWorkflowOpen: boolean;
   userQuery: string;
   fileSystem: FileSystemNode[];
+  selectedFolderId: string | null;
 
   // Actions
   setActiveProject: (project: string) => void;
@@ -44,6 +45,7 @@ interface StoreState {
   setAgentRunning: (agent: string, isRunning: boolean) => void;
   toggleTerminal: () => void;
   toggleWorkflow: () => void;
+  setWorkflowOpen: (isOpen: boolean) => void;
   setUserQuery: (query: string) => void;
   createNewProject: (name: string, description?: string, goal?: string, source?: string, priority?: string) => void;
   deleteProject: (name: string) => void;
@@ -55,21 +57,14 @@ interface StoreState {
   expandFolder: (id: string) => void;
   collapseAllFolders: () => void;
   setFileSystem: (nodes: FileSystemNode[]) => void;
+  setSelectedFolderId: (id: string | null) => void;
 }
 
 const initialCode = `# No active project selected.\\n# Create a new research project to begin.\\n`;
 
 const initialNodes: Node[] = [];
 const initialEdges: Edge[] = [];
-const initialFileSystem: FileSystemNode[] = [
-  {
-    id: 'root-1',
-    name: 'mare-dashboard',
-    type: 'folder',
-    isOpen: true,
-    children: []
-  }
-];
+const initialFileSystem: FileSystemNode[] = [];
 
 export const useStore = create<StoreState>()(
   persist(
@@ -91,6 +86,7 @@ export const useStore = create<StoreState>()(
       isWorkflowOpen: false,
       userQuery: '',
       fileSystem: initialFileSystem,
+      selectedFolderId: null,
 
       setActiveProject: (project) => set({ activeProject: project }),
       setActiveAgent: (agent) => set((state) => {
@@ -155,6 +151,7 @@ export const useStore = create<StoreState>()(
       })),
       toggleTerminal: () => set((state) => ({ isTerminalOpen: !state.isTerminalOpen })),
       toggleWorkflow: () => set((state) => ({ isWorkflowOpen: !state.isWorkflowOpen })),
+      setWorkflowOpen: (isOpen) => set({ isWorkflowOpen: isOpen }),
       setUserQuery: (query) => set({ userQuery: query }),
       createNewProject: (name, description, goal, source, priority) => set((state) => {
         if (state.projects.includes(name)) return state;
@@ -311,6 +308,7 @@ export const useStore = create<StoreState>()(
         return { fileSystem: collapseNodes(state.fileSystem) };
       }),
       setFileSystem: (nodes) => set({ fileSystem: nodes }),
+      setSelectedFolderId: (id) => set({ selectedFolderId: id }),
     }),
     {
       name: 'mare-store',

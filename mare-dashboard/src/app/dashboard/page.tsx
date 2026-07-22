@@ -7,11 +7,11 @@ import PropertiesPanel from '@/components/PropertiesPanel';
 import TerminalOutput from '@/components/TerminalOutput';
 import CodeEditor from '@/components/CodeEditor';
 import WorkflowVisualizer from '@/components/WorkflowVisualizer';
-import MenuBar from '@/components/MenuBar';
+
 import { useStore } from '@/store/useStore';
 
 export default function Dashboard() {
-  const { runningAgents, setAgentRunning, addTerminalLog, updateLastTerminalLog, clearTerminalLogs, isTerminalOpen, activeAgent, setActiveAgent, openAgents, addOpenAgent, editorCode, updateAgentScript, isWorkflowOpen, toggleWorkflow, userQuery, setUserQuery } = useStore();
+  const { runningAgents, setAgentRunning, addTerminalLog, updateLastTerminalLog, clearTerminalLogs, isTerminalOpen, activeAgent, setActiveAgent, openAgents, addOpenAgent, editorCode, updateAgentScript, isWorkflowOpen, toggleWorkflow, userQuery, setUserQuery, selectedFolderId } = useStore();
   const [workflowWidth, setWorkflowWidth] = useState(500);
   const [isAgentDropdownOpen, setIsAgentDropdownOpen] = useState(false);
   const [agentWidths, setAgentWidths] = useState<Record<string, number>>({});
@@ -96,6 +96,20 @@ export default function Dashboard() {
           }
         }
         
+        const jsonBlocks = [...currentScriptCode.matchAll(/```json\s*([\s\S]*?)\s*```/g)];
+        for (const match of jsonBlocks) {
+          try {
+            const parsed = JSON.parse(match[1]);
+            if (parsed.workflow && parsed.workflow.nodes && parsed.workflow.edges) {
+              useStore.getState().setWorkflowNodes(parsed.workflow.nodes);
+              useStore.getState().setWorkflowEdges(parsed.workflow.edges);
+              useStore.getState().setWorkflowOpen(true);
+              addTerminalLog(`> Status: <span class="text-accent-blue">Generated workflow from response.</span>`);
+              break;
+            }
+          } catch (e) {}
+        }
+        
         addTerminalLog(`> Status: <span class="text-accent-green">${agentToRun.toUpperCase()} TASK COMPLETED</span>`);
       } catch (error: any) {
         addTerminalLog(`> <span class="text-accent-red">Error (${agentToRun}):</span> ${error.message}`);
@@ -109,7 +123,6 @@ export default function Dashboard() {
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden text-base bg-[var(--color-bg-primary)]">
-      <MenuBar onNewFile={() => {}} onNewFolder={() => {}} />
       {/* Top Navigation Bar */}
       <header className="flex h-16 shrink-0 items-center justify-between border-b border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] px-6">
         <div className="flex items-center gap-3">
@@ -182,11 +195,10 @@ export default function Dashboard() {
 
       {/* Main Content Area */}
       <div className="flex flex-1 overflow-hidden">
-        <Explorer />
         <main className="flex flex-1 flex-col overflow-hidden bg-[var(--color-bg-primary)] p-4 gap-4">
           <div className="flex flex-1 min-h-[50%]">
-            <div className="flex-1 overflow-x-auto overflow-y-hidden flex pb-2 custom-scrollbar">
-              {openAgents.map((agent, index) => (
+              <div className="flex-1 overflow-x-auto overflow-y-hidden flex pb-2 custom-scrollbar">
+                {openAgents.map((agent, index) => (
                 <React.Fragment key={agent}>
                   <div 
                     style={agentWidths[agent] ? { width: agentWidths[agent], flex: 'none' } : { flex: 1, minWidth: 300 }}
