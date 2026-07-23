@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Play, Bell, Search, Activity, Cpu, Network, ChevronDown } from 'lucide-react';
 import Explorer from '@/components/Explorer';
 import PropertiesPanel from '@/components/PropertiesPanel';
@@ -13,7 +14,8 @@ import MenuBar from '@/components/MenuBar';
 import { useStore } from '@/store/useStore';
 
 export default function Dashboard() {
-  const { runningAgents, setAgentRunning, addTerminalLog, updateLastTerminalLog, clearTerminalLogs, isTerminalOpen, activeAgent, setActiveAgent, openAgents, addOpenAgent, editorCode, updateAgentScript, isWorkflowOpen, toggleWorkflow, userQuery, setUserQuery, selectedFolderId } = useStore();
+  const router = useRouter();
+  const { runningAgents, setAgentRunning, addTerminalLog, updateLastTerminalLog, clearTerminalLogs, isTerminalOpen, activeAgent, setActiveAgent, openAgents, addOpenAgent, editorCode, updateAgentScript, isWorkflowOpen, toggleWorkflow, userQuery, setUserQuery, selectedFolderId, activeProject } = useStore();
   const [workflowWidth, setWorkflowWidth] = useState(500);
   const [isAgentDropdownOpen, setIsAgentDropdownOpen] = useState(false);
   const [agentWidths, setAgentWidths] = useState<Record<string, number>>({});
@@ -21,6 +23,12 @@ export default function Dashboard() {
   const currentAgent = activeAgent || 'Researcher Agent';
   const areOpenAgentsRunning = openAgents.some(agent => runningAgents[agent]);
   const isAnyAgentRunning = Object.values(runningAgents).some(Boolean);
+
+  useEffect(() => {
+    if (!activeProject) {
+      router.replace('/');
+    }
+  }, [activeProject, router]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -122,6 +130,10 @@ export default function Dashboard() {
 
     await Promise.all(runPromises);
   };
+
+  if (!activeProject) {
+    return null;
+  }
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden text-base bg-[var(--color-bg-primary)]">

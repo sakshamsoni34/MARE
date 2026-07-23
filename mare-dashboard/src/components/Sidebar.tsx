@@ -5,9 +5,9 @@ import { useStore, Agent } from '@/store/useStore';
 type ActivityTab = 'Dashboard' | 'Agent Control' | 'Planning' | 'Research' | 'Execution' | 'Analysis' | 'Reporting' | 'Monitoring' | 'Projects' | 'Settings';
 
 export default function Sidebar() {
-  const { activeAgent, setActiveAgent, addOpenAgent, toggleWorkflow, isWorkflowOpen } = useStore();
+  const { activeAgent, setActiveAgent, addOpenAgent, toggleWorkflow, isWorkflowOpen, activeProject } = useStore();
   const [activeTab, setActiveTab] = useState<ActivityTab>('Planning');
-  const [isPanelOpen, setIsPanelOpen] = useState(true);
+  const [isPanelOpen, setIsPanelOpen] = useState(false);
 
   const handleAgentClick = (agent: Agent) => {
     setActiveAgent(agent);
@@ -61,7 +61,22 @@ export default function Sidebar() {
   const renderPanelContent = () => {
     switch(activeTab) {
       case 'Dashboard':
-        return <div className="p-4 text-text-secondary text-sm">Dashboard Overview</div>;
+        return (
+          <div className="p-4 flex flex-col gap-4">
+            <div className="text-text-primary text-sm font-semibold">Dashboard Overview</div>
+            {activeProject ? (
+              <div className="flex flex-col gap-1">
+                <span className="text-xs text-text-secondary uppercase tracking-wider">Active Folder</span>
+                <div className="flex items-center gap-2 bg-[var(--color-bg-tertiary)] p-2 rounded text-text-primary text-sm">
+                  <Folder size={14} className="text-brand-400 shrink-0" />
+                  <span className="truncate" title={activeProject}>{activeProject}</span>
+                </div>
+              </div>
+            ) : (
+              <div className="text-text-secondary text-xs">No active folder. Go to Home to open a folder.</div>
+            )}
+          </div>
+        );
       case 'Agent Control':
         return (
           <div className="flex flex-col gap-0.5 p-2">
