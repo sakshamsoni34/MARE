@@ -1,239 +1,168 @@
-import React, { useState, useEffect } from 'react';
-import { Folder, Play, Settings, Database, BookOpen, BrainCircuit, Code, Eye, Pause, Plus, Activity, User, Box, ShieldCheck, Zap, X } from 'lucide-react';
+import React, { useState } from 'react';
+import { Home, Bot, BrainCircuit, Search, Settings, BarChart2, FileText, Activity, Folder, Cog, Network } from 'lucide-react';
 import { useStore, Agent } from '@/store/useStore';
 
+type ActivityTab = 'Dashboard' | 'Agent Control' | 'Planning' | 'Research' | 'Execution' | 'Analysis' | 'Reporting' | 'Monitoring' | 'Projects' | 'Settings';
+
 export default function Sidebar() {
-  const { activeProject, setActiveProject, activeAgent, setActiveAgent, projects, createNewProject, deleteProject } = useStore();
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [projectToDelete, setProjectToDelete] = useState<string | null>(null);
-  const [contextMenuInfo, setContextMenuInfo] = useState<{x: number, y: number, projectName: string} | null>(null);
+  const { activeAgent, setActiveAgent, addOpenAgent, toggleWorkflow, isWorkflowOpen } = useStore();
+  const [activeTab, setActiveTab] = useState<ActivityTab>('Planning');
+  const [isPanelOpen, setIsPanelOpen] = useState(true);
 
-  useEffect(() => {
-    const handleClick = () => setContextMenuInfo(null);
-    window.addEventListener('click', handleClick);
-    return () => window.removeEventListener('click', handleClick);
-  }, []);
-  const [newProjectName, setNewProjectName] = useState('');
-  const [newProjectDesc, setNewProjectDesc] = useState('');
-  const [newProjectGoal, setNewProjectGoal] = useState('Data Analysis');
-  const [newProjectSource, setNewProjectSource] = useState('');
-  const [newProjectPriority, setNewProjectPriority] = useState('Medium');
+  const handleAgentClick = (agent: Agent) => {
+    setActiveAgent(agent);
+    addOpenAgent(agent);
+  };
 
-  const handleNewResearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (newProjectName && newProjectName.trim()) {
-      if (typeof createNewProject === 'function') {
-        createNewProject(newProjectName.trim(), newProjectDesc.trim(), newProjectGoal, newProjectSource.trim(), newProjectPriority);
-      } else {
-        // Fallback for hot-reload without alert
-        window.location.reload();
-      }
-      setIsModalOpen(false);
-      setNewProjectName('');
-      setNewProjectDesc('');
-      setNewProjectGoal('Data Analysis');
-      setNewProjectSource('');
-      setNewProjectPriority('Medium');
+  const handleTabClick = (tab: ActivityTab) => {
+    if (activeTab === tab) {
+      setIsPanelOpen(!isPanelOpen);
+    } else {
+      setActiveTab(tab);
+      setIsPanelOpen(true);
     }
   };
 
-  const agents: { name: Agent, icon: React.ReactNode, statusIcon: React.ReactNode }[] = [
-    { name: 'Researcher Agent', icon: <BookOpen size={18} />, statusIcon: <Activity size={14} className="text-brand-400" /> },
-    { name: 'Coder Agent', icon: <Code size={18} />, statusIcon: <Play size={14} className="text-text-tertiary group-hover:text-white transition-colors" /> },
-    { name: 'Planner Agent', icon: <BrainCircuit size={18} />, statusIcon: <Play size={14} className="text-accent-green" /> },
-    { name: 'Executor Agent', icon: <Box size={18} />, statusIcon: <Pause size={14} className="text-accent-yellow" /> },
-    { name: 'Reviewer Agent', icon: <ShieldCheck size={18} />, statusIcon: <Play size={14} className="text-text-tertiary group-hover:text-white transition-colors" /> },
-    { name: 'Designer Agent', icon: <Eye size={18} />, statusIcon: <Play size={14} className="text-text-tertiary group-hover:text-white transition-colors" /> },
-    { name: 'Tester Agent', icon: <Activity size={18} />, statusIcon: <Play size={14} className="text-text-tertiary group-hover:text-white transition-colors" /> },
-  ];
+  const ActivityIcon = ({ icon, label, isActive, onClick }: any) => (
+    <div
+      onClick={onClick}
+      title={label}
+      className={`flex items-center justify-center w-12 h-12 cursor-pointer transition-colors relative text-text-secondary hover:text-white ${isActive ? 'text-white' : ''}`}
+    >
+      {isActive && <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-brand-400" />}
+      {icon}
+    </div>
+  );
+
+  const StaticItem = ({ label }: { label: string }) => (
+    <div className="flex items-center gap-2 rounded-md px-3 py-1.5 ml-1 cursor-pointer text-text-secondary hover:bg-[var(--color-bg-tertiary)] hover:text-white transition-colors">
+      <div className="w-1.5 h-1.5 rounded-full bg-text-tertiary" />
+      <span className="text-[13px]">{label}</span>
+    </div>
+  );
+
+  const AgentItem = ({ agent, displayName }: { agent: string, displayName?: string }) => {
+    const isActive = activeAgent === agent;
+    return (
+      <div
+        onClick={() => handleAgentClick(agent as Agent)}
+        className={`flex items-center gap-2 rounded-md px-3 py-1.5 ml-1 cursor-pointer transition-colors ${
+          isActive 
+            ? 'bg-brand-500/10 text-brand-400' 
+            : 'text-text-secondary hover:bg-[var(--color-bg-tertiary)] hover:text-white'
+        }`}
+      >
+        <div className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-brand-400' : 'bg-text-tertiary'}`} />
+        <span className="text-[13px]">{displayName || agent.replace(' Agent', '')}</span>
+      </div>
+    );
+  };
+
+  const renderPanelContent = () => {
+    switch(activeTab) {
+      case 'Dashboard':
+        return <div className="p-4 text-text-secondary text-sm">Dashboard Overview</div>;
+      case 'Agent Control':
+        return (
+          <div className="flex flex-col gap-0.5 p-2">
+            <StaticItem label="All Agents" />
+            <StaticItem label="Agent Status" />
+            <StaticItem label="Create Agent" />
+            <StaticItem label="Agent Registry" />
+          </div>
+        );
+      case 'Planning':
+        return (
+          <div className="flex flex-col gap-0.5 p-2">
+            <AgentItem agent="Planner Agent" />
+            <AgentItem agent="Task Decomposer Agent" displayName="Task Decomposer" />
+            <AgentItem agent="Goal Manager Agent" displayName="Goal Manager" />
+          </div>
+        );
+      case 'Research':
+        return (
+          <div className="flex flex-col gap-0.5 p-2">
+            <AgentItem agent="Web Search Agent" displayName="Web Research Agent" />
+            <AgentItem agent="Academic Research Agent" displayName="Academic Research Agent" />
+            <AgentItem agent="Browser Agent" />
+            <AgentItem agent="News Agent" />
+          </div>
+        );
+      case 'Execution':
+        return (
+          <div className="flex flex-col gap-0.5 p-2">
+            <AgentItem agent="Code Agent" />
+            <AgentItem agent="Python Agent" />
+            <AgentItem agent="Executor Agent" displayName="API Agent" />
+            <AgentItem agent="Automation Agent" />
+          </div>
+        );
+      case 'Analysis':
+        return (
+          <div className="flex flex-col gap-0.5 p-2">
+            <AgentItem agent="Data Analysis Agent" />
+            <AgentItem agent="Visualization Agent" />
+            <AgentItem agent="Validation Agent" />
+          </div>
+        );
+      case 'Reporting':
+        return (
+          <div className="flex flex-col gap-0.5 p-2">
+            <AgentItem agent="Report Generator Agent" displayName="Report Generator" />
+            <AgentItem agent="Presentation Agent" />
+            <AgentItem agent="Export Agent" displayName="Export" />
+          </div>
+        );
+      case 'Monitoring':
+        return (
+          <div className="flex flex-col gap-0.5 p-2">
+            <AgentItem agent="Live Workflow Agent" displayName="Live Workflow" />
+            <AgentItem agent="Agent Communication Agent" displayName="Agent Communication" />
+            <AgentItem agent="Logs Agent" displayName="Logs" />
+            <AgentItem agent="Events Agent" displayName="Events" />
+          </div>
+        );
+      case 'Projects':
+        return <div className="p-4 text-text-secondary text-sm">Projects List</div>;
+      case 'Settings':
+        return <div className="p-4 text-text-secondary text-sm">Settings Configuration</div>;
+      default:
+        return null;
+    }
+  };
 
   return (
-    <aside className="w-72 shrink-0 border-r border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] flex flex-col">
-      <div className="p-5">
-        <button 
-          onClick={() => setIsModalOpen(true)}
-          className="flex w-full items-center justify-center gap-2 rounded-lg border border-[var(--color-border-secondary)] bg-[var(--color-bg-primary)] py-2.5 text-sm font-medium text-text-secondary hover:bg-[var(--color-bg-tertiary)] hover:border-brand-500/50 hover:text-white transition-all shadow-sm"
-        >
-          <Plus size={16} /> New Project
-        </button>
-      </div>
+    <div className="flex h-full border-r border-[var(--color-border-primary)] shrink-0 z-20 bg-[var(--color-bg-secondary)]">
+      {/* Activity Bar (Icons only) */}
+      <aside className="w-12 shrink-0 bg-[#1e1e1e] flex flex-col items-center py-2 h-full border-r border-[#2d2d2d] z-10">
+        <ActivityIcon icon={<Home size={22} strokeWidth={1.5} />} label="Dashboard" isActive={activeTab === 'Dashboard'} onClick={() => handleTabClick('Dashboard')} />
+        <ActivityIcon icon={<Bot size={22} strokeWidth={1.5} />} label="Agent Control" isActive={activeTab === 'Agent Control'} onClick={() => handleTabClick('Agent Control')} />
+        <ActivityIcon icon={<BrainCircuit size={22} strokeWidth={1.5} />} label="Planning" isActive={activeTab === 'Planning'} onClick={() => handleTabClick('Planning')} />
+        <ActivityIcon icon={<Search size={22} strokeWidth={1.5} />} label="Research" isActive={activeTab === 'Research'} onClick={() => handleTabClick('Research')} />
+        <ActivityIcon icon={<Cog size={22} strokeWidth={1.5} />} label="Execution" isActive={activeTab === 'Execution'} onClick={() => handleTabClick('Execution')} />
+        <ActivityIcon icon={<BarChart2 size={22} strokeWidth={1.5} />} label="Analysis" isActive={activeTab === 'Analysis'} onClick={() => handleTabClick('Analysis')} />
+        <ActivityIcon icon={<FileText size={22} strokeWidth={1.5} />} label="Reporting" isActive={activeTab === 'Reporting'} onClick={() => handleTabClick('Reporting')} />
+        <ActivityIcon icon={<Activity size={22} strokeWidth={1.5} />} label="Monitoring" isActive={activeTab === 'Monitoring'} onClick={() => handleTabClick('Monitoring')} />
+        
+        <div className="flex-1" />
+        
+        <ActivityIcon icon={<Network size={22} strokeWidth={1.5} />} label="Workflow Config" isActive={isWorkflowOpen} onClick={toggleWorkflow} />
+        <ActivityIcon icon={<Folder size={22} strokeWidth={1.5} />} label="Projects" isActive={activeTab === 'Projects'} onClick={() => handleTabClick('Projects')} />
+        <ActivityIcon icon={<Settings size={22} strokeWidth={1.5} />} label="Settings" isActive={activeTab === 'Settings'} onClick={() => handleTabClick('Settings')} />
+      </aside>
 
-      <div className="flex-1 overflow-y-auto px-3 pb-6">
-        <div className="mb-6">
-          <div className="flex items-center gap-2 px-3 py-2 text-sm font-semibold tracking-wider text-text-secondary uppercase">
-            <span>Projects</span>
+      {/* Primary Sidebar (Panel) */}
+      {isPanelOpen && (
+        <aside className="w-56 shrink-0 bg-[var(--color-bg-secondary)] flex flex-col h-full overflow-y-auto custom-scrollbar select-none">
+          <div className="px-4 py-3 text-xs font-semibold tracking-wider text-text-primary uppercase border-b border-[var(--color-border-primary)]/50">
+            {activeTab}
           </div>
-          <div className="ml-4 mt-2 flex flex-col gap-1.5">
-            {(projects || []).map((proj) => (
-              <div
-                key={proj}
-                onClick={() => setActiveProject(proj)}
-                onContextMenu={(e) => {
-                  e.preventDefault();
-                  setContextMenuInfo({ x: e.pageX, y: e.pageY, projectName: proj });
-                }}
-                className={`flex cursor-pointer items-center gap-3 rounded-md px-3 py-2 transition-colors ${activeProject === proj ? 'bg-[var(--color-bg-tertiary)] text-brand-400' : 'text-text-primary hover:bg-[var(--color-bg-tertiary)]'}`}
-              >
-                <Folder size={18} className={activeProject === proj ? 'text-brand-400' : 'text-text-tertiary'} />
-                <span className="text-sm">{proj}</span>
-              </div>
-            ))}
+          <div className="flex-1 overflow-y-auto pt-2">
+            {renderPanelContent()}
           </div>
-        </div>
-
-
-      </div>
-
-      {/* New Research Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="w-[450px] rounded-xl border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] shadow-2xl">
-            <div className="flex items-center justify-between border-b border-[var(--color-border-primary)] px-6 py-4">
-              <h2 className="text-lg font-semibold text-white">Create New Research</h2>
-              <button 
-                onClick={() => setIsModalOpen(false)}
-                className="text-text-tertiary hover:text-white transition-colors"
-              >
-                <X size={20} />
-              </button>
-            </div>
-            
-            <form onSubmit={handleNewResearch} className="p-6">
-              <div className="mb-4">
-                <label className="mb-2 block text-sm font-medium text-text-secondary">Research Name <span className="text-accent-red">*</span></label>
-                <input
-                  type="text"
-                  required
-                  autoFocus
-                  placeholder="e.g., Q3 Market Analysis"
-                  value={newProjectName}
-                  onChange={(e) => setNewProjectName(e.target.value)}
-                  className="w-full rounded-md border border-[var(--color-border-primary)] bg-[var(--color-bg-primary)] px-4 py-2 text-sm text-text-primary outline-none focus:border-brand-500 transition-colors"
-                />
-              </div>
-              
-              <div className="mb-4">
-                <label className="mb-2 block text-sm font-medium text-text-secondary">Description (Optional)</label>
-                <textarea
-                  placeholder="Brief context for the agents..."
-                  rows={2}
-                  value={newProjectDesc}
-                  onChange={(e) => setNewProjectDesc(e.target.value)}
-                  className="w-full resize-none rounded-md border border-[var(--color-border-primary)] bg-[var(--color-bg-primary)] px-4 py-2 text-sm text-text-primary outline-none focus:border-brand-500 transition-colors"
-                />
-              </div>
-
-              <div className="mb-4 flex gap-4">
-                <div className="flex-1">
-                  <label className="mb-2 block text-sm font-medium text-text-secondary">Primary Goal</label>
-                  <select
-                    value={newProjectGoal}
-                    onChange={(e) => setNewProjectGoal(e.target.value)}
-                    className="w-full rounded-md border border-[var(--color-border-primary)] bg-[var(--color-bg-primary)] px-4 py-2 text-sm text-text-primary outline-none focus:border-brand-500 transition-colors"
-                  >
-                    <option value="Data Analysis">Data Analysis</option>
-                    <option value="Literature Review">Literature Review</option>
-                    <option value="Code Generation">Code Generation</option>
-                    <option value="Security Audit">Security Audit</option>
-                    <option value="General Assistant">General Assistant</option>
-                  </select>
-                </div>
-                <div className="w-1/3">
-                  <label className="mb-2 block text-sm font-medium text-text-secondary">Priority</label>
-                  <select
-                    value={newProjectPriority}
-                    onChange={(e) => setNewProjectPriority(e.target.value)}
-                    className="w-full rounded-md border border-[var(--color-border-primary)] bg-[var(--color-bg-primary)] px-4 py-2 text-sm text-text-primary outline-none focus:border-brand-500 transition-colors"
-                  >
-                    <option value="Low">Low</option>
-                    <option value="Medium">Medium</option>
-                    <option value="High">High</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="mb-6">
-                <label className="mb-2 block text-sm font-medium text-text-secondary">Data Source / URL (Optional)</label>
-                <input
-                  type="text"
-                  placeholder="e.g., https://api.example.com/data or s3://bucket"
-                  value={newProjectSource}
-                  onChange={(e) => setNewProjectSource(e.target.value)}
-                  className="w-full rounded-md border border-[var(--color-border-primary)] bg-[var(--color-bg-primary)] px-4 py-2 text-sm text-text-primary outline-none focus:border-brand-500 transition-colors"
-                />
-              </div>
-              
-              <div className="flex justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="rounded-lg border border-[var(--color-border-primary)] px-5 py-2 text-sm font-medium text-text-secondary hover:bg-[var(--color-bg-tertiary)] hover:text-white transition-all"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={!newProjectName.trim()}
-                  className="rounded-lg bg-brand-600 px-5 py-2 text-sm font-medium text-white shadow-md hover:bg-brand-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                >
-                  Create Research
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+        </aside>
       )}
-
-      {/* Delete Project Confirmation Modal */}
-      {projectToDelete && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="w-[400px] rounded-xl border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] shadow-2xl p-6">
-            <h2 className="text-lg font-semibold text-white mb-2">Delete Research</h2>
-            <p className="text-sm text-text-secondary mb-6">
-              Are you sure you want to permanently delete the research project 
-              <span className="text-white font-medium ml-1">"{projectToDelete}"</span>? 
-              This action cannot be undone.
-            </p>
-            <div className="flex justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setProjectToDelete(null)}
-                className="rounded-lg border border-[var(--color-border-primary)] px-5 py-2 text-sm font-medium text-text-secondary hover:bg-[var(--color-bg-tertiary)] hover:text-white transition-all"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  deleteProject(projectToDelete);
-                  setProjectToDelete(null);
-                }}
-                className="rounded-lg bg-accent-red px-5 py-2 text-sm font-medium text-white shadow-md hover:bg-accent-red/80 transition-all"
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      {/* Context Menu */}
-      {contextMenuInfo && (
-        <div 
-          className="fixed z-[100] w-40 rounded-md border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] shadow-xl py-1 overflow-hidden"
-          style={{ top: contextMenuInfo.y, left: contextMenuInfo.x }}
-        >
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setProjectToDelete(contextMenuInfo.projectName);
-              setContextMenuInfo(null);
-            }}
-            className="flex w-full items-center px-4 py-2 text-sm text-accent-red hover:bg-[var(--color-bg-tertiary)] transition-colors text-left font-medium"
-          >
-            Delete Project
-          </button>
-        </div>
-      )}
-    </aside>
+    </div>
   );
 }
+

@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { Node, Edge } from '@xyflow/react';
 
-export type Agent = 'Researcher Agent' | 'Coder Agent' | 'Planner Agent' | 'Executor Agent' | 'Reviewer Agent' | 'Designer Agent' | 'Tester Agent';
+export type Agent = 'Researcher Agent' | 'Coder Agent' | 'Planner Agent' | 'Executor Agent' | 'Reviewer Agent' | 'Designer Agent' | 'Tester Agent' | 'Task Decomposer Agent' | 'Goal Manager Agent' | 'Web Search Agent' | 'Academic Research Agent' | 'Browser Agent' | 'News Agent' | 'Code Agent' | 'Python Agent' | 'Automation Agent' | 'Data Analysis Agent' | 'Visualization Agent' | 'Validation Agent' | 'Report Generator Agent' | 'Presentation Agent' | 'Export Agent' | 'Live Workflow Agent' | 'Agent Communication Agent' | 'Logs Agent' | 'Events Agent';
 
 export type FileSystemNode = {
   id: string;
@@ -71,8 +71,8 @@ export const useStore = create<StoreState>()(
     (set) => ({
       projects: [],
       activeProject: '',
-      activeAgent: 'Researcher Agent',
-      openAgents: ['Researcher Agent'],
+      activeAgent: null,
+      openAgents: [],
       terminalLogs: [
         '> Status: IDLE...',
         '> System ready. Create a new research project to deploy agents.'

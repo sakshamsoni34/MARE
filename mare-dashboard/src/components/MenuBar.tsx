@@ -277,10 +277,10 @@ export default function MenuBar({ onNewFile, onNewFolder }: MenuBarProps) {
 
   return (
     <div ref={menuRef} className="flex h-9 w-full shrink-0 items-center justify-between bg-[#181818] px-2 text-[13px] text-[#cccccc] relative font-sans border-b border-[#2b2b2b] select-none z-50">
-      <div className="flex items-center h-full">
+      <div className="flex items-center h-full flex-1">
         {/* Logo placeholder */}
-        <div className="flex items-center justify-center w-8 h-full mr-1 cursor-default">
-          <div className="w-4 h-4 bg-brand-500 rounded-sm"></div>
+        <div className="flex items-center justify-center w-8 h-full mr-1 cursor-default text-brand-400">
+           <LayoutTemplate size={16} />
         </div>
         {navItems.map((item) => (
           <div 
@@ -295,6 +295,19 @@ export default function MenuBar({ onNewFile, onNewFolder }: MenuBarProps) {
         {renderDropdown()}
       </div>
 
+      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-xs font-medium text-[#cccccc]">
+        MARE
+      </div>
+
+      <div className="flex items-center justify-end h-full flex-1 gap-2">
+        <div className="flex items-center gap-1 mr-2 text-[#cccccc]">
+          <div className="p-1 hover:bg-white/10 rounded cursor-pointer"><PanelLeft size={14} /></div>
+          <div className="p-1 hover:bg-white/10 rounded cursor-pointer"><PanelBottom size={14} /></div>
+          <div className="p-1 hover:bg-white/10 rounded cursor-pointer"><PanelRight size={14} /></div>
+          <div className="p-1 hover:bg-white/10 rounded cursor-pointer ml-1"><Search size={14} /></div>
+          <div className="p-1 hover:bg-white/10 rounded cursor-pointer ml-1"><UserCircle size={14} /></div>
+        </div>
+      </div>
     </div>
   );
 }

@@ -13,13 +13,13 @@
   --color-brand-900: #4c1d95;
   --color-brand-950: #2e1065;
   
-  --color-bg-primary: #12121a;
-  --color-bg-secondary: #1a1a24;
-  --color-bg-tertiary: #242433;
-  --color-bg-panel: #1e1e2d;
+  --color-bg-primary: #000000;
+  --color-bg-secondary: #0a0a0a;
+  --color-bg-tertiary: #141414;
+  --color-bg-panel: #0d0d0d;
   
-  --color-border-primary: #2d2d3d;
-  --color-border-secondary: #3b3b4f;
+  --color-border-primary: #1f1f1f;
+  --color-border-secondary: #2a2a2a;
   
   --color-text-primary: #f8fafc;
   --color-text-secondary: #94a3b8;
@@ -33,7 +33,7 @@
 }
 
 :root {
-  background: radial-gradient(circle at center, #2a2a2a 0%, #000000 100%);
+  background: #000000;
   color: var(--color-text-primary);
 }
 
@@ -42,7 +42,7 @@ body {
   padding: 0;
   height: 100vh;
   overflow: hidden; /* App should act like a desktop app */
-  background: radial-gradient(circle at center, #2a2a2a 0%, #000000 100%);
+  background: #000000;
 }
 
 /* Custom Scrollbar for a premium feel */
