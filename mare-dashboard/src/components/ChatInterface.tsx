@@ -295,8 +295,15 @@ export default function ChatInterface({ agent }: ChatInterfaceProps) {
       >
         {(() => {
           const initialText = `# ${agent} Script\n\n# Write your ${agent.toLowerCase()} prompt here...\n`;
-          const isInitialState = code.trim() === initialText.trim() || code.trim() === '';
-          const displayCode = code.startsWith(initialText) ? code.substring(initialText.length).trimStart() : code;
+          const isLegacyInitialState = code.trim().startsWith('#') && !code.includes('**You:**') && !code.includes(`**${agent}:**`);
+          const isInitialState = code.trim() === '' || isLegacyInitialState;
+          
+          let displayCode = code;
+          if (isLegacyInitialState) {
+            displayCode = '';
+          } else if (code.startsWith(initialText)) {
+            displayCode = code.substring(initialText.length).trimStart();
+          }
 
           if (isInitialState || !displayCode) {
             return (

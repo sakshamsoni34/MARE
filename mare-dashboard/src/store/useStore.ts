@@ -64,7 +64,7 @@ interface StoreState {
   updateNodeContent: (id: string, content: string, agentName?: Agent) => void;
 }
 
-const initialCode = `# No active project selected.\\n# Create a new research project to begin.\\n`;
+const initialCode = ``;
 
 const initialNodes: Node[] = [];
 const initialEdges: Edge[] = [];
@@ -101,7 +101,7 @@ export const useStore = create<StoreState>()(
         const newScripts = { ...state.agentScripts, [currentAgent]: state.editorCode };
 
         // Load the new agent's script, or default
-        const newCode = newScripts[agent] || `# ${agent} Script\n\n# Write your ${agent.toLowerCase()} prompt here...\n`;
+        const newCode = newScripts[agent] || '';
 
         return {
           activeAgent: agent,
@@ -116,8 +116,8 @@ export const useStore = create<StoreState>()(
           openAgents: [...state.openAgents, agent],
           activeAgent: agent
         };
-        if (!currentScript) {
-          newState.agentScripts = { ...state.agentScripts, [agent]: `# ${agent} Script\n\n# Write your ${agent.toLowerCase()} prompt here...\n` };
+        if (currentScript === undefined) {
+          newState.agentScripts = { ...state.agentScripts, [agent]: '' };
         }
         return newState;
       }),
@@ -166,7 +166,7 @@ export const useStore = create<StoreState>()(
         if (source) metaText += `\n# Data Source: ${source}`;
         if (priority) metaText += `\n# Priority: ${priority}`;
 
-        const newInitialCode = `# Research Project: ${name}${metaText}\n\n# Write your research code here...\n`;
+        const newInitialCode = ``;
 
         return {
           projects: [...state.projects, name],
@@ -295,12 +295,12 @@ export const useStore = create<StoreState>()(
 
         let newAgentScripts = { ...state.agentScripts };
         deletedAgents.forEach(agent => {
-          newAgentScripts[agent] = `# ${agent} Script\n\n# Write your ${agent.toLowerCase()} prompt here...\n`;
+          newAgentScripts[agent] = '';
         });
 
         let newEditorCode = state.editorCode;
         if (state.activeAgent && deletedAgents.has(state.activeAgent)) {
-          newEditorCode = `# ${state.activeAgent} Script\n\n# Write your ${state.activeAgent.toLowerCase()} prompt here...\n`;
+          newEditorCode = '';
         }
 
         return { 
@@ -385,8 +385,6 @@ export const useStore = create<StoreState>()(
       partialize: (state) => ({
         projects: state.projects,
         activeProject: state.activeProject,
-        agentScripts: state.agentScripts,
-        editorCode: state.editorCode,
         openAgents: state.openAgents,
         fileSystem: state.fileSystem
       })
