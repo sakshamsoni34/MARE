@@ -10,6 +10,9 @@ export type FileSystemNode = {
   type: 'file' | 'folder';
   children?: FileSystemNode[];
   isOpen?: boolean;
+  content?: string;
+  agentName?: Agent;
+  agentContents?: Record<string, string>;
 };
 
 interface StoreState {
@@ -58,6 +61,7 @@ interface StoreState {
   collapseAllFolders: () => void;
   setFileSystem: (nodes: FileSystemNode[]) => void;
   setSelectedFolderId: (id: string | null) => void;
+  updateNodeContent: (id: string, content: string, agentName?: Agent) => void;
 }
 
 const initialCode = `# No active project selected.\\n# Create a new research project to begin.\\n`;
@@ -91,16 +95,16 @@ export const useStore = create<StoreState>()(
       setActiveProject: (project) => set({ activeProject: project }),
       setActiveAgent: (agent) => set((state) => {
         if (state.activeAgent === agent) return state;
-        
+
         // Save current editor code to the previous agent's script
         const currentAgent = state.activeAgent || 'Researcher Agent';
         const newScripts = { ...state.agentScripts, [currentAgent]: state.editorCode };
-        
+
         // Load the new agent's script, or default
         const newCode = newScripts[agent] || `# ${agent} Script\n\n# Write your ${agent.toLowerCase()} prompt here...\n`;
-        
-        return { 
-          activeAgent: agent, 
+
+        return {
+          activeAgent: agent,
           agentScripts: newScripts,
           editorCode: newCode
         };
@@ -108,7 +112,7 @@ export const useStore = create<StoreState>()(
       addOpenAgent: (agent) => set((state) => {
         if (state.openAgents.includes(agent)) return { activeAgent: agent };
         const currentScript = state.agentScripts[agent];
-        const newState: Partial<StoreState> = { 
+        const newState: Partial<StoreState> = {
           openAgents: [...state.openAgents, agent],
           activeAgent: agent
         };
@@ -133,7 +137,7 @@ export const useStore = create<StoreState>()(
         return { terminalLogs: newLogs };
       }),
       clearTerminalLogs: () => set({ terminalLogs: [] }),
-      setEditorCode: (code) => set((state) => ({ 
+      setEditorCode: (code) => set((state) => ({
         editorCode: code,
         agentScripts: { ...state.agentScripts, [state.activeAgent || 'Researcher Agent']: code }
       })),
@@ -146,8 +150,8 @@ export const useStore = create<StoreState>()(
       }),
       setWorkflowNodes: (nodes) => set({ workflowNodes: nodes }),
       setWorkflowEdges: (edges) => set({ workflowEdges: edges }),
-      setAgentRunning: (agent, isRunning) => set((state) => ({ 
-        runningAgents: { ...state.runningAgents, [agent]: isRunning } 
+      setAgentRunning: (agent, isRunning) => set((state) => ({
+        runningAgents: { ...state.runningAgents, [agent]: isRunning }
       })),
       toggleTerminal: () => set((state) => ({ isTerminalOpen: !state.isTerminalOpen })),
       toggleWorkflow: () => set((state) => ({ isWorkflowOpen: !state.isWorkflowOpen })),
@@ -155,7 +159,7 @@ export const useStore = create<StoreState>()(
       setUserQuery: (query) => set({ userQuery: query }),
       createNewProject: (name, description, goal, source, priority) => set((state) => {
         if (state.projects.includes(name)) return state;
-        
+
         let metaText = ``;
         if (description) metaText += `\n# Details: ${description}`;
         if (goal) metaText += `\n# Goal: ${goal}`;
@@ -163,14 +167,14 @@ export const useStore = create<StoreState>()(
         if (priority) metaText += `\n# Priority: ${priority}`;
 
         const newInitialCode = `# Research Project: ${name}${metaText}\n\n# Write your research code here...\n`;
-        
+
         return {
           projects: [...state.projects, name],
           activeProject: name,
           editorCode: newInitialCode,
           agentScripts: { 'Researcher Agent': newInitialCode },
           terminalLogs: [
-            '> Status: IDLE...', 
+            '> Status: IDLE...',
             `> New research project "${name}" initialized.`,
             ...(description ? [`> Context: ${description}`] : []),
             ...(goal ? [`> Goal: ${goal}`] : []),
@@ -182,8 +186,8 @@ export const useStore = create<StoreState>()(
       }),
       deleteProject: (name) => set((state) => {
         const newProjects = state.projects.filter(p => p !== name);
-        const newActiveProject = state.activeProject === name 
-          ? (newProjects.length > 0 ? newProjects[0] : '') 
+        const newActiveProject = state.activeProject === name
+          ? (newProjects.length > 0 ? newProjects[0] : '')
           : state.activeProject;
         return {
           projects: newProjects,
@@ -193,7 +197,7 @@ export const useStore = create<StoreState>()(
       }),
       createFile: (parentId, name) => set((state) => {
         const newNode: FileSystemNode = { id: Date.now().toString(), name, type: 'file' };
-        
+
         if (!parentId) {
           if (state.fileSystem.length > 0 && state.fileSystem[0].type === 'folder') {
             const newFileSystem = [...state.fileSystem];
@@ -202,7 +206,7 @@ export const useStore = create<StoreState>()(
           }
           return { fileSystem: [...state.fileSystem, newNode] };
         }
-        
+
         const addNodeToParent = (nodes: FileSystemNode[]): FileSystemNode[] => {
           return nodes.map(node => {
             if (node.id === parentId && node.type === 'folder') {
@@ -214,12 +218,12 @@ export const useStore = create<StoreState>()(
             return node;
           });
         };
-        
+
         return { fileSystem: addNodeToParent(state.fileSystem) };
       }),
       createFolder: (parentId, name) => set((state) => {
         const newNode: FileSystemNode = { id: Date.now().toString(), name, type: 'folder', isOpen: false, children: [] };
-        
+
         if (!parentId) {
           if (state.fileSystem.length > 0 && state.fileSystem[0].type === 'folder') {
             const newFileSystem = [...state.fileSystem];
@@ -228,7 +232,7 @@ export const useStore = create<StoreState>()(
           }
           return { fileSystem: [...state.fileSystem, newNode] };
         }
-        
+
         const addNodeToParent = (nodes: FileSystemNode[]): FileSystemNode[] => {
           return nodes.map(node => {
             if (node.id === parentId && node.type === 'folder') {
@@ -240,7 +244,7 @@ export const useStore = create<StoreState>()(
             return node;
           });
         };
-        
+
         return { fileSystem: addNodeToParent(state.fileSystem) };
       }),
       renameNode: (id, newName) => set((state) => {
@@ -258,20 +262,57 @@ export const useStore = create<StoreState>()(
         return { fileSystem: renameInNodes(state.fileSystem) };
       }),
       deleteNode: (id) => set((state) => {
+        const deletedAgents = new Set<string>();
+
+        const findAgentsInNode = (node: FileSystemNode) => {
+          if (node.type === 'file') {
+            if (node.agentName) deletedAgents.add(node.agentName);
+            if (node.agentContents) {
+              Object.keys(node.agentContents).forEach(agent => deletedAgents.add(agent));
+            }
+          }
+          if (node.children) {
+            node.children.forEach(findAgentsInNode);
+          }
+        };
+
         const deleteFromNodes = (nodes: FileSystemNode[]): FileSystemNode[] => {
-          return nodes.filter(node => node.id !== id).map(node => {
+          return nodes.filter(node => {
+            if (node.id === id) {
+              findAgentsInNode(node);
+              return false;
+            }
+            return true;
+          }).map(node => {
             if (node.children) {
               return { ...node, children: deleteFromNodes(node.children) };
             }
             return node;
           });
         };
-        return { fileSystem: deleteFromNodes(state.fileSystem) };
+
+        const newFileSystem = deleteFromNodes(state.fileSystem);
+
+        let newAgentScripts = { ...state.agentScripts };
+        deletedAgents.forEach(agent => {
+          newAgentScripts[agent] = `# ${agent} Script\n\n# Write your ${agent.toLowerCase()} prompt here...\n`;
+        });
+
+        let newEditorCode = state.editorCode;
+        if (state.activeAgent && deletedAgents.has(state.activeAgent)) {
+          newEditorCode = `# ${state.activeAgent} Script\n\n# Write your ${state.activeAgent.toLowerCase()} prompt here...\n`;
+        }
+
+        return { 
+          fileSystem: newFileSystem,
+          agentScripts: newAgentScripts,
+          editorCode: newEditorCode
+        };
       }),
       toggleFolder: (id) => set((state) => {
         const toggleNode = (nodes: FileSystemNode[]): FileSystemNode[] => {
           return nodes.map(node => {
-            if (node.id === id && node.type === 'folder') {
+            if (node.id === id) {
               return { ...node, isOpen: !node.isOpen };
             }
             if (node.children) {
@@ -309,6 +350,35 @@ export const useStore = create<StoreState>()(
       }),
       setFileSystem: (nodes) => set({ fileSystem: nodes }),
       setSelectedFolderId: (id) => set({ selectedFolderId: id }),
+      updateNodeContent: (id, content, agentName) => set((state) => {
+        const updateInNodes = (nodes: FileSystemNode[]): FileSystemNode[] => {
+          return nodes.map(node => {
+            if (node.id === id) {
+              const currentAgentContents = node.agentContents || {};
+              // Migrate legacy content if needed
+              if (node.content && node.agentName && Object.keys(currentAgentContents).length === 0) {
+                currentAgentContents[node.agentName] = node.content;
+              }
+              const targetAgent = agentName || node.agentName || 'Researcher Agent';
+
+              return {
+                ...node,
+                content, // keep legacy field just in case
+                agentName: targetAgent,
+                agentContents: {
+                  ...currentAgentContents,
+                  [targetAgent]: content
+                }
+              };
+            }
+            if (node.children) {
+              return { ...node, children: updateInNodes(node.children) };
+            }
+            return node;
+          });
+        };
+        return { fileSystem: updateInNodes(state.fileSystem) };
+      }),
     }),
     {
       name: 'mare-store',
@@ -317,7 +387,8 @@ export const useStore = create<StoreState>()(
         activeProject: state.activeProject,
         agentScripts: state.agentScripts,
         editorCode: state.editorCode,
-        openAgents: state.openAgents
+        openAgents: state.openAgents,
+        fileSystem: state.fileSystem
       })
     }
   )

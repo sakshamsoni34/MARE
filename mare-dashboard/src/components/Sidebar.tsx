@@ -1,15 +1,30 @@
 import React, { useState } from 'react';
 import { Home, Bot, BrainCircuit, Search, Settings, BarChart2, FileText, Activity, Folder, Cog, Network } from 'lucide-react';
 import { useStore, Agent } from '@/store/useStore';
+import Explorer from '@/components/Explorer';
 
-type ActivityTab = 'Dashboard' | 'Agent Control' | 'Planning' | 'Research' | 'Execution' | 'Analysis' | 'Reporting' | 'Monitoring' | 'Projects' | 'Settings';
+type ActivityTab = 'Explorer' | 'Agent Control' | 'Planning' | 'Research' | 'Execution' | 'Analysis' | 'Reporting' | 'Monitoring' | 'Projects' | 'Settings';
 
 export default function Sidebar() {
   const { activeAgent, setActiveAgent, addOpenAgent, toggleWorkflow, isWorkflowOpen, activeProject } = useStore();
   const [activeTab, setActiveTab] = useState<ActivityTab>('Planning');
   const [isPanelOpen, setIsPanelOpen] = useState(false);
+  const [contextMenu, setContextMenu] = useState<{ x: number, y: number } | null>(null);
+
+  React.useEffect(() => {
+    const handleClick = () => setContextMenu(null);
+    window.addEventListener('click', handleClick);
+    return () => window.removeEventListener('click', handleClick);
+  }, []);
+
+  const [showToast, setShowToast] = useState(false);
 
   const handleAgentClick = (agent: Agent) => {
+    if (!activeProject) {
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000);
+      return;
+    }
     setActiveAgent(agent);
     addOpenAgent(agent);
   };
@@ -60,23 +75,8 @@ export default function Sidebar() {
 
   const renderPanelContent = () => {
     switch(activeTab) {
-      case 'Dashboard':
-        return (
-          <div className="p-4 flex flex-col gap-4">
-            <div className="text-text-primary text-sm font-semibold">Dashboard Overview</div>
-            {activeProject ? (
-              <div className="flex flex-col gap-1">
-                <span className="text-xs text-text-secondary uppercase tracking-wider">Active Folder</span>
-                <div className="flex items-center gap-2 bg-[var(--color-bg-tertiary)] p-2 rounded text-text-primary text-sm">
-                  <Folder size={14} className="text-brand-400 shrink-0" />
-                  <span className="truncate" title={activeProject}>{activeProject}</span>
-                </div>
-              </div>
-            ) : (
-              <div className="text-text-secondary text-xs">No active folder. Go to Home to open a folder.</div>
-            )}
-          </div>
-        );
+      case 'Explorer':
+        return <Explorer />;
       case 'Agent Control':
         return (
           <div className="flex flex-col gap-0.5 p-2">
@@ -147,10 +147,17 @@ export default function Sidebar() {
   };
 
   return (
-    <div className="flex h-full border-r border-[var(--color-border-primary)] shrink-0 z-20 bg-[var(--color-bg-secondary)]">
+    <>
+      {showToast && (
+        <div className="fixed top-12 right-6 z-[9999] bg-[#1e1e1e] border border-[#2d2d2d] border-l-4 border-l-red-500 text-[#e0e0e0] px-5 py-3 rounded shadow-2xl text-sm flex items-center gap-3 transition-all duration-300 animate-in fade-in slide-in-from-right-8">
+          <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+          <span>Please select or create a project folder to use agents.</span>
+        </div>
+      )}
+      <div className="flex h-full border-r border-[var(--color-border-primary)] shrink-0 z-20 bg-[var(--color-bg-secondary)]">
       {/* Activity Bar (Icons only) */}
       <aside className="w-12 shrink-0 bg-[#1e1e1e] flex flex-col items-center py-2 h-full border-r border-[#2d2d2d] z-10">
-        <ActivityIcon icon={<Home size={22} strokeWidth={1.5} />} label="Dashboard" isActive={activeTab === 'Dashboard'} onClick={() => handleTabClick('Dashboard')} />
+        <ActivityIcon icon={<Home size={22} strokeWidth={1.5} />} label="Explorer" isActive={activeTab === 'Explorer'} onClick={() => handleTabClick('Explorer')} />
         <ActivityIcon icon={<Bot size={22} strokeWidth={1.5} />} label="Agent Control" isActive={activeTab === 'Agent Control'} onClick={() => handleTabClick('Agent Control')} />
         <ActivityIcon icon={<BrainCircuit size={22} strokeWidth={1.5} />} label="Planning" isActive={activeTab === 'Planning'} onClick={() => handleTabClick('Planning')} />
         <ActivityIcon icon={<Search size={22} strokeWidth={1.5} />} label="Research" isActive={activeTab === 'Research'} onClick={() => handleTabClick('Research')} />
@@ -177,7 +184,8 @@ export default function Sidebar() {
           </div>
         </aside>
       )}
-    </div>
+      </div>
+    </>
   );
 }
 

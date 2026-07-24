@@ -17,7 +17,7 @@ export default function RootPage() {
   const handleOpenFolder = async () => {
     try {
       // @ts-ignore - showDirectoryPicker is not in standard lib types yet
-      const dirHandle = await window.showDirectoryPicker();
+      const dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
       setActiveProject(dirHandle.name);
       router.replace('/dashboard');
     } catch (error: any) {

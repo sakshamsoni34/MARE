@@ -7,6 +7,7 @@ import Explorer from '@/components/Explorer';
 import PropertiesPanel from '@/components/PropertiesPanel';
 import TerminalOutput from '@/components/TerminalOutput';
 import CodeEditor from '@/components/CodeEditor';
+import ChatInterface from '@/components/ChatInterface';
 import WorkflowVisualizer from '@/components/WorkflowVisualizer';
 import Sidebar from '@/components/Sidebar';
 import MenuBar from '@/components/MenuBar';
@@ -20,15 +21,21 @@ export default function Dashboard() {
   const [isAgentDropdownOpen, setIsAgentDropdownOpen] = useState(false);
   const [agentWidths, setAgentWidths] = useState<Record<string, number>>({});
 
-  const currentAgent = activeAgent || 'Researcher Agent';
+  const currentAgent = activeAgent || 'Explorer';
   const areOpenAgentsRunning = openAgents.some(agent => runningAgents[agent]);
   const isAnyAgentRunning = Object.values(runningAgents).some(Boolean);
 
+  const [mounted, setMounted] = useState(false);
+  
   useEffect(() => {
-    if (!activeProject) {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (mounted && !activeProject) {
       router.replace('/');
     }
-  }, [activeProject, router]);
+  }, [activeProject, router, mounted]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -131,7 +138,7 @@ export default function Dashboard() {
     await Promise.all(runPromises);
   };
 
-  if (!activeProject) {
+  if (!mounted || !activeProject) {
     return null;
   }
 
@@ -158,7 +165,11 @@ export default function Dashboard() {
                           style={agentWidths[agent] ? { width: agentWidths[agent], flex: 'none' } : { flex: 1, minWidth: 300 }}
                           className="flex flex-col"
                         >
-                          <CodeEditor agent={agent} />
+                          {agent.toLowerCase().includes('coder') || agent.toLowerCase().includes('python') || agent.toLowerCase().includes('automation') ? (
+                            <CodeEditor agent={agent} />
+                          ) : (
+                            <ChatInterface agent={agent} />
+                          )}
                         </div>
                         {index < openAgents.length - 1 && (
                           <div
@@ -166,17 +177,17 @@ export default function Dashboard() {
                             onMouseDown={(e) => {
                               const startX = e.clientX;
                               const startWidth = agentWidths[agent] || (e.currentTarget.previousElementSibling as HTMLElement)?.clientWidth || 400;
-  
+
                               const onMouseMove = (moveEvent: MouseEvent) => {
                                 const newWidth = Math.max(250, startWidth + (moveEvent.clientX - startX));
                                 setAgentWidths(prev => ({ ...prev, [agent]: newWidth }));
                               };
-  
+
                               const onMouseUp = () => {
                                 document.removeEventListener('mousemove', onMouseMove);
                                 document.removeEventListener('mouseup', onMouseUp);
                               };
-  
+
                               document.addEventListener('mousemove', onMouseMove);
                               document.addEventListener('mouseup', onMouseUp);
                             }}

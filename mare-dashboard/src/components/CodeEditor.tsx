@@ -1,16 +1,27 @@
-import React from 'react';
+import React, { useState } from 'react';
 import Editor from '@monaco-editor/react';
 import { Code, Play, Save } from 'lucide-react';
-import { useStore, Agent } from '@/store/useStore';
+import { useStore, Agent, FileSystemNode } from '@/store/useStore';
 
 interface CodeEditorProps {
   agent: Agent;
 }
 
 export default function CodeEditor({ agent }: CodeEditorProps) {
-  const { agentScripts, updateAgentScript, removeOpenAgent, activeAgent, setActiveAgent, runningAgents, setAgentRunning, addTerminalLog, userQuery } = useStore();
+  const { agentScripts, updateAgentScript, removeOpenAgent, activeAgent, setActiveAgent, runningAgents, setAgentRunning, addTerminalLog, userQuery, selectedFolderId, updateNodeContent, fileSystem } = useStore();
   const code = agentScripts[agent] || '';
   const isRunning = runningAgents[agent];
+
+  const findNode = (nodes: FileSystemNode[], id: string): FileSystemNode | undefined => {
+    for (const node of nodes) {
+      if (node.id === id) return node;
+      if (node.children) {
+        const found = findNode(node.children, id);
+        if (found) return found;
+      }
+    }
+    return undefined;
+  };
 
   const handleEditorChange = (value: string | undefined) => {
     if (value !== undefined) {
@@ -103,8 +114,26 @@ export default function CodeEditor({ agent }: CodeEditorProps) {
     }
   };
 
+  const [showSavePopup, setShowSavePopup] = useState<string | null>(null);
+
   const handleSave = async (e: React.MouseEvent) => {
     e.stopPropagation();
+
+    // Save to virtual file system if a file is selected
+    if (selectedFolderId) {
+      const selectedNode = findNode(fileSystem, selectedFolderId);
+      if (selectedNode && selectedNode.type === 'file') {
+        updateNodeContent(selectedFolderId, code, agent);
+        addTerminalLog(`> <span class="text-accent-green">Success:</span> Saved script to file "${selectedNode.name}".`);
+        
+        // Show popup
+        setShowSavePopup(`Saved in file "${selectedNode.name}"`);
+        setTimeout(() => setShowSavePopup(null), 3000);
+        
+        return;
+      }
+    }
+
     try {
       const handle = await (window as any).showSaveFilePicker({
         suggestedName: `${agent.replace(' ', '_').toLowerCase()}_output.md`,
@@ -117,6 +146,10 @@ export default function CodeEditor({ agent }: CodeEditorProps) {
       await writable.write(code);
       await writable.close();
       addTerminalLog(`> <span class="text-accent-green">Success:</span> Saved ${agent} response to local file system.`);
+      
+      // Show popup
+      setShowSavePopup(`Saved to local file system`);
+      setTimeout(() => setShowSavePopup(null), 3000);
     } catch (err: any) {
       if (err.name !== 'AbortError') {
         addTerminalLog(`> <span class="text-accent-red">Error:</span> Failed to save file: ${err.message}`);
@@ -180,6 +213,14 @@ export default function CodeEditor({ agent }: CodeEditorProps) {
           }}
         />
       </div>
+
+      {/* Save Popup */}
+      {showSavePopup && (
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-brand-600 text-white px-4 py-2 rounded-md shadow-lg flex items-center gap-2 z-50 animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <Save size={16} />
+          <span className="text-sm font-medium">{showSavePopup}</span>
+        </div>
+      )}
     </div>
   );
 }

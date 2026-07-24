@@ -5,10 +5,19 @@ from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
+from contextlib import asynccontextmanager
 
 load_dotenv()
 
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Initialize the HTTPX client for connection pooling
+    app.state.client = httpx.AsyncClient()
+    yield
+    # Close the client on shutdown
+    await app.state.client.aclose()
+
+app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -18,8 +27,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-def get_base_prompt(agent_name: str) -> str:
-    prompts = {
+AGENT_PROMPTS = {
         'Planner Agent' : 'You are the Planner Agent. Your responsibility is to convert high-level user requests into a strategic execution plan. Responsibilities: - Understand the users objective. - Identify constraints, assumptions, risks, and dependencies. - Create a logical execution strategy. - Decide which specialized agents should be invoked. - Produce milestones and priorities. - Never perform research or coding yourself. Output Format: 1. Objective 2. Scope 3. Constraints 4. Execution Strategy 5. Required Agents 6. Milestones 7. Expected Deliverables',
         'Task Decomposer Agent' : 'You are the Task Decomposer Agent. Your responsibility is to transform a complex objective into small, independent, executable tasks. Responsibilities: - Break work into atomic tasks. - Detect task dependencies. - Estimate complexity. - Mark tasks that can execute in parallel. - Assign suggested agents for every task. - Never solve the tasks. Output Format: - Task ID - Description - Dependency - Estimated Complexity - Parallelizable (Yes/No) - Suggested Agent',
         'Goal Manager Agent' : 'You are the Goal Manager Agent. Your responsibility is to monitor the overall mission throughout execution. Responsibilities: - Track completed goals. - Track pending goals. - Detect deviations. - Ensure every task contributes to the main objective. - Update project progress. - Recommend replanning when necessary. Output Format: - Overall Goal - Progress - Completed Goals - Remaining Goals - Blockers - Recommendations',
@@ -41,7 +49,9 @@ def get_base_prompt(agent_name: str) -> str:
         'Logs Agent' : 'You are the Logs Agent. Your responsibility is to maintain detailed execution logs. Responsibilities: - Record every action. - Track timestamps. - Capture errors. - Record retries. - Record execution duration. - Maintain audit history. Output Format: - Timestamp - Agent - Action - Status - Duration - Message',
         'Events Agent' : 'You are the Events Agent. Your responsibility is to monitor and publish workflow events. Responsibilities: - Detect state changes. - Emit events. - Notify subscribed agents. - Maintain event history. - Categorize events by severity. Supported Events: - Task Started - Task Completed - Task Failed - Agent Spawned - Agent Finished - Retry - Warning - Error - Workflow Completed. Output Format: - Event ID - Timestamp - Event Type - Source - Target - Severity - Description',
     }
-    return prompts.get(agent_name, 'You are a helpful AI assistant in the MARE multi-agent system.')
+
+def get_base_prompt(agent_name: str) -> str:
+    return AGENT_PROMPTS.get(agent_name, 'You are a helpful AI assistant in the MARE multi-agent system.')
 
 workflow_instruction = '''
 If the user asks for a workflow or diagram, you must provide it using a JSON block formatted exactly like this:
@@ -96,24 +106,24 @@ async def handle_agent_request(request: Request):
     }
 
     async def stream_generator():
-        async with httpx.AsyncClient() as client:
-            try:
-                async with client.stream(
-                    "POST",
-                    "https://api.mistral.ai/v1/chat/completions",
-                    headers=headers,
-                    json=mistral_payload,
-                    timeout=httpx.Timeout(60.0)
-                ) as response:
-                    if response.status_code != 200:
-                        error_text = await response.aread()
-                        yield f"data: {json.dumps({'error': f'Mistral API Error: {response.status_code}', 'details': error_text.decode('utf-8', errors='ignore')})}\n\n".encode('utf-8')
-                        return
-                    
-                    async for chunk in response.aiter_bytes():
-                        yield chunk
-            except Exception as e:
-                yield f"data: {json.dumps({'error': str(e)})}\n\n".encode('utf-8')
+        try:
+            client = request.app.state.client
+            async with client.stream(
+                "POST",
+                "https://api.mistral.ai/v1/chat/completions",
+                headers=headers,
+                json=mistral_payload,
+                timeout=httpx.Timeout(60.0)
+            ) as response:
+                if response.status_code != 200:
+                    error_text = await response.aread()
+                    yield f"data: {json.dumps({'error': f'Mistral API Error: {response.status_code}', 'details': error_text.decode('utf-8', errors='ignore')})}\n\n".encode('utf-8')
+                    return
+                
+                async for chunk in response.aiter_bytes():
+                    yield chunk
+        except Exception as e:
+            yield f"data: {json.dumps({'error': str(e)})}\n\n".encode('utf-8')
 
     return StreamingResponse(
         stream_generator(),

@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useStore } from '@/store/useStore';
 import { PanelLeft, PanelBottom, PanelRight, LayoutTemplate, Search, Monitor, Settings, UserCircle } from 'lucide-react';
 
@@ -10,6 +11,7 @@ interface MenuBarProps {
 }
 
 export default function MenuBar({ onNewFile, onNewFolder }: MenuBarProps) {
+  const router = useRouter();
   const [activeMenu, setActiveMenu] = useState<MenuState>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -32,7 +34,7 @@ export default function MenuBar({ onNewFile, onNewFolder }: MenuBarProps) {
   const MenuItem = ({ label, shortcut, divider, onClick }: { label?: string, shortcut?: string, divider?: boolean, onClick?: () => void }) => {
     if (divider) return <div className="h-px bg-[#3c3c3c] my-1 mx-2" />;
     return (
-      <div 
+      <div
         className="flex items-center justify-between px-6 py-1.5 text-[13px] text-[#cccccc] hover:bg-[#0078d4] hover:text-white cursor-pointer group"
         onClick={() => {
           onClick?.();
@@ -68,9 +70,9 @@ export default function MenuBar({ onNewFile, onNewFolder }: MenuBarProps) {
     for await (const entry of dirHandle.values()) {
       // Skip heavy/hidden folders to avoid hanging
       if (entry.name === 'node_modules' || entry.name === '.git' || entry.name === '.next') continue;
-      
+
       const id = parentId ? `${parentId}/${entry.name}` : entry.name;
-      
+
       if (entry.kind === 'directory') {
         nodes.push({
           id,
@@ -96,8 +98,8 @@ export default function MenuBar({ onNewFile, onNewFolder }: MenuBarProps) {
 
   const handleOpenFolder = async () => {
     try {
-      const dirHandle = await (window as any).showDirectoryPicker();
-      
+      const dirHandle = await (window as any).showDirectoryPicker({ mode: 'readwrite' });
+
       const rootNode = {
         id: 'root-1',
         name: dirHandle.name,
@@ -105,9 +107,11 @@ export default function MenuBar({ onNewFile, onNewFolder }: MenuBarProps) {
         isOpen: true,
         children: await readDirectory(dirHandle)
       };
-      
+
       useStore.getState().setFileSystem([rootNode]);
+      useStore.getState().setActiveProject(dirHandle.name);
       addTerminalLog(`> <span class="text-accent-green">Success:</span> Loaded folder [${dirHandle.name}] and its contents.`);
+      router.push('/dashboard');
     } catch (err: unknown) {
       if (err instanceof Error && err.name === 'AbortError') return;
       addTerminalLog(`> <span class="text-accent-red">Error:</span> Failed to open folder: ${err instanceof Error ? err.message : String(err)}`);
@@ -280,10 +284,10 @@ export default function MenuBar({ onNewFile, onNewFolder }: MenuBarProps) {
       <div className="flex items-center h-full flex-1">
         {/* Logo placeholder */}
         <div className="flex items-center justify-center w-8 h-full mr-1 cursor-default text-brand-400">
-           <LayoutTemplate size={16} />
+          <LayoutTemplate size={16} />
         </div>
         {navItems.map((item) => (
-          <div 
+          <div
             key={item}
             className={`px-2 py-1 cursor-pointer rounded-md mx-0.5 flex items-center ${activeMenu === item ? 'bg-[#3c3c3c] text-white' : 'hover:bg-white/10 hover:text-white'}`}
             onClick={() => setActiveMenu(activeMenu === item ? null : item)}
