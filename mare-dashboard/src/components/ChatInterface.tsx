@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MessageSquare, Play, Save, Plus, Mic, AudioLines } from 'lucide-react';
+import { MessageSquare, Play, Save, Plus, Mic, AudioLines, X, Maximize2, FileText, Bot } from 'lucide-react';
 import { useStore, Agent, FileSystemNode } from '@/store/useStore';
 
 interface ChatInterfaceProps {
@@ -97,12 +97,78 @@ const AGENT_CONFIGS: Record<string, { description: string, prompts: string[] }> 
   }
 };
 
+const escapeRegExp = (string: string) => string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const getAgentTheme = (agentName: string) => {
+  const themes = [
+    { bg: 'bg-blue-500/5', border: 'border-blue-500/20', hoverBorder: 'hover:border-blue-500/50', text: 'text-blue-400', glow: 'from-blue-500/20', iconBg: 'bg-blue-500/10', iconText: 'text-blue-400', hoverBg: 'hover:bg-blue-500/10' },
+    { bg: 'bg-purple-500/5', border: 'border-purple-500/20', hoverBorder: 'hover:border-purple-500/50', text: 'text-purple-400', glow: 'from-purple-500/20', iconBg: 'bg-purple-500/10', iconText: 'text-purple-400', hoverBg: 'hover:bg-purple-500/10' },
+    { bg: 'bg-emerald-500/5', border: 'border-emerald-500/20', hoverBorder: 'hover:border-emerald-500/50', text: 'text-emerald-400', glow: 'from-emerald-500/20', iconBg: 'bg-emerald-500/10', iconText: 'text-emerald-400', hoverBg: 'hover:bg-emerald-500/10' },
+    { bg: 'bg-amber-500/5', border: 'border-amber-500/20', hoverBorder: 'hover:border-amber-500/50', text: 'text-amber-400', glow: 'from-amber-500/20', iconBg: 'bg-amber-500/10', iconText: 'text-amber-400', hoverBg: 'hover:bg-amber-500/10' },
+    { bg: 'bg-rose-500/5', border: 'border-rose-500/20', hoverBorder: 'hover:border-rose-500/50', text: 'text-rose-400', glow: 'from-rose-500/20', iconBg: 'bg-rose-500/10', iconText: 'text-rose-400', hoverBg: 'hover:bg-rose-500/10' },
+    { bg: 'bg-cyan-500/5', border: 'border-cyan-500/20', hoverBorder: 'hover:border-cyan-500/50', text: 'text-cyan-400', glow: 'from-cyan-500/20', iconBg: 'bg-cyan-500/10', iconText: 'text-cyan-400', hoverBg: 'hover:bg-cyan-500/10' },
+  ];
+  let hash = 0;
+  for (let i = 0; i < agentName.length; i++) {
+    hash = agentName.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return themes[Math.abs(hash) % themes.length];
+};
+
+const formatMarkdown = (text: string, agentTheme: any) => {
+  if (!text) return null;
+  const lines = text.split('\n');
+  return lines.map((line, i) => {
+    if (line.trim() === '---') {
+      return <hr key={i} className="my-4 border-white/5" />;
+    }
+    
+    let formatted = line
+      .replace(/\*\*(.*?)\*\*/g, `<strong class="font-medium text-gray-100">$1</strong>`)
+      .replace(/\*(.*?)\*/g, `<em class="italic text-gray-400">$1</em>`)
+      .replace(/`(.*?)`/g, `<code class="bg-black/40 px-1.5 py-0.5 rounded text-[12px] font-mono text-gray-300 border border-white/5">$1</code>`)
+      .replace(/\[(.*?)\]\((.*?)\)/g, `<a href="$2" target="_blank" class="${agentTheme.text} hover:underline">$1</a>`);
+
+    if (line.trim().startsWith('- ')) {
+      return (
+        <div key={i} className="flex gap-3 my-1.5 items-start">
+          <span className={`${agentTheme.text} mt-1.5 text-[8px]`}>●</span>
+          <span dangerouslySetInnerHTML={{ __html: formatted.substring(2) }} />
+        </div>
+      );
+    }
+    
+    const numListMatch = line.match(/^(\d+\.)\s(.*)/);
+    if (numListMatch) {
+      const remainingFormatted = formatted.replace(/^\d+\.\s/, '');
+      return (
+        <div key={i} className="flex gap-2 my-1.5 items-start">
+          <span className={`${agentTheme.text} font-medium`}>{numListMatch[1]}</span>
+          <span dangerouslySetInnerHTML={{ __html: remainingFormatted }} />
+        </div>
+      );
+    }
+
+    if (line.trim() === '') return <div key={i} className="h-1.5"></div>;
+
+    if (line.trim().startsWith('>')) {
+      return (
+        <div key={i} className={`border-l-2 ${agentTheme.border} pl-3 my-2 text-gray-400 italic bg-black/20 p-2 rounded-r-md`} dangerouslySetInnerHTML={{ __html: formatted.replace(/^>\s?/, '') }}></div>
+      );
+    }
+
+    return <div key={i} dangerouslySetInnerHTML={{ __html: formatted }} className="my-1" />;
+  });
+};
+
 export default function ChatInterface({ agent }: ChatInterfaceProps) {
   const { agentScripts, updateAgentScript, removeOpenAgent, activeAgent, setActiveAgent, runningAgents, setAgentRunning, addTerminalLog, userQuery, selectedFolderId, updateNodeContent, fileSystem } = useStore();
   const code = agentScripts[agent] || '';
   const isRunning = runningAgents[agent];
   const scrollRef = useRef<HTMLDivElement>(null);
   const [localQuery, setLocalQuery] = useState('');
+  const [expandedSection, setExpandedSection] = useState<{msgId: string, idx: number} | null>(null);
+  const agentTheme = getAgentTheme(agent);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -290,7 +356,7 @@ export default function ChatInterface({ agent }: ChatInterfaceProps) {
       </div>
       <div 
         ref={scrollRef}
-        className="flex-1 overflow-y-auto p-4 text-gray-300 font-sans text-sm whitespace-pre-wrap break-words"
+        className="flex-1 overflow-y-auto p-4 text-gray-300 font-sans text-sm whitespace-pre-wrap break-words custom-scrollbar"
         style={{ fontFamily: "Inter, sans-serif", lineHeight: 1.6 }}
       >
         {(() => {
@@ -337,7 +403,111 @@ export default function ChatInterface({ agent }: ChatInterfaceProps) {
             );
           }
 
-          return displayCode;
+          const renderAgentResponse = (msgId: string, text: string) => {
+            const headingRegex = /^(#{1,6})\s+(.*)$/gm;
+            const sections: {title: string, content: string}[] = [];
+            let lastIndex = 0;
+            let currentTitle = 'Overview';
+            
+            let match;
+            while ((match = headingRegex.exec(text)) !== null) {
+              if (match.index > lastIndex) {
+                const content = text.substring(lastIndex, match.index).trim();
+                if (content) {
+                  sections.push({ title: currentTitle, content });
+                }
+              }
+              currentTitle = match[2].replace(/\*\*/g, '').trim();
+              lastIndex = headingRegex.lastIndex;
+            }
+            
+            if (lastIndex < text.length) {
+              const content = text.substring(lastIndex).trim();
+              if (content) {
+                sections.push({ title: currentTitle, content });
+              }
+            }
+            
+            const finalSections = sections.length > 0 ? sections : [{ title: 'Response', content: text }];
+
+            return (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 w-full">
+                {finalSections.map((sec, idx) => {
+                  const isExpanded = expandedSection?.msgId === msgId && expandedSection?.idx === idx;
+                  return (
+                    <div 
+                      key={idx}
+                      onClick={() => {
+                        if (isExpanded) setExpandedSection(null);
+                        else setExpandedSection({ msgId, idx });
+                      }}
+                      className={`group cursor-pointer ${agentTheme.bg} border ${agentTheme.border} ${agentTheme.hoverBorder} ${agentTheme.hoverBg} rounded-lg transition-all relative overflow-hidden ${isExpanded ? 'col-span-1 md:col-span-2 shadow-lg' : ''}`}
+                    >
+                      <div className={`absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl ${agentTheme.glow} to-transparent opacity-0 group-hover:opacity-100 transition-opacity`}></div>
+                      
+                      <div className="px-4 py-3 flex items-center justify-between relative z-10">
+                        <h3 className={`text-sm font-medium transition-colors pr-2 ${isExpanded ? agentTheme.text : 'text-gray-200 group-hover:text-white truncate'}`}>
+                          {sec.title}
+                        </h3>
+                        <Maximize2 size={14} className={`text-gray-500 transition-transform shrink-0 duration-300 ${isExpanded ? `rotate-180 ${agentTheme.text}` : `opacity-0 group-hover:opacity-100 scale-75 group-hover:scale-100 ${agentTheme.text}`}`} />
+                      </div>
+
+                      {isExpanded && (
+                        <div className="px-4 pb-4 text-[13.5px] text-gray-300 leading-relaxed border-t border-[#333333] pt-3 mt-1 animate-in fade-in slide-in-from-top-2 duration-200">
+                          {formatMarkdown(sec.content, agentTheme)}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          };
+
+          const tokenUser = '**You:**';
+          const tokenAgent = `**${agent}:**`;
+          const regex = new RegExp(`(${escapeRegExp(tokenUser)}|${escapeRegExp(tokenAgent)})([\\s\\S]*?)(?=(?:${escapeRegExp(tokenUser)}|${escapeRegExp(tokenAgent)}|$))`, 'g');
+          
+          const messages: any[] = [];
+          let match;
+          let idCounter = 0;
+          
+          while ((match = regex.exec(displayCode)) !== null) {
+            const isUser = match[1] === tokenUser;
+            messages.push({
+              id: `msg-${idCounter++}`,
+              sender: isUser ? 'user' : 'agent',
+              text: match[2].trim()
+            });
+          }
+
+          if (messages.length === 0) {
+             return displayCode;
+          }
+
+          return (
+            <div className="flex flex-col gap-6">
+              {messages.map((msg) => (
+                <div key={msg.id} className={`flex flex-col ${msg.sender === 'user' ? 'items-end' : 'items-start'}`}>
+                  {msg.sender === 'user' ? (
+                    <div className="bg-brand-500/20 border border-brand-500/30 text-brand-100 px-4 py-2.5 rounded-2xl rounded-tr-sm max-w-[85%] text-[13.5px] shadow-sm">
+                      {msg.text}
+                    </div>
+                  ) : (
+                    <div className="w-full">
+                      <div className="flex items-center gap-2 mb-3 px-1">
+                        <div className={`w-7 h-7 rounded-lg ${agentTheme.iconBg} border border-white/5 flex items-center justify-center shadow-sm`}>
+                          <Bot size={16} className={agentTheme.iconText} />
+                        </div>
+                        <span className={`text-[11px] font-bold ${agentTheme.text} uppercase tracking-wider`}>{agent}</span>
+                      </div>
+                      {renderAgentResponse(msg.id, msg.text)}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          );
         })()}
       </div>
 
