@@ -293,7 +293,7 @@ export const useStore = create<StoreState>()(
           newEditorCode = '';
         }
 
-        return { 
+        return {
           fileSystem: newFileSystem,
           agentScripts: newAgentScripts,
           editorCode: newEditorCode
@@ -373,10 +373,7 @@ export const useStore = create<StoreState>()(
     {
       name: 'mare-store',
       partialize: (state) => ({
-        projects: state.projects,
-        activeProject: state.activeProject,
-        openAgents: state.openAgents,
-        fileSystem: state.fileSystem
+        openAgents: state.openAgents
       })
     }
   )
