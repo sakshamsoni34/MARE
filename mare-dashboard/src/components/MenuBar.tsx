@@ -100,15 +100,8 @@ export default function MenuBar({ onNewFile, onNewFolder }: MenuBarProps) {
     try {
       const dirHandle = await (window as any).showDirectoryPicker({ mode: 'readwrite' });
 
-      const rootNode = {
-        id: 'root-1',
-        name: dirHandle.name,
-        type: 'folder' as const,
-        isOpen: true,
-        children: await readDirectory(dirHandle)
-      };
-
-      useStore.getState().setFileSystem([rootNode]);
+      const children = await readDirectory(dirHandle);
+      useStore.getState().setFileSystem(children);
       useStore.getState().setActiveProject(dirHandle.name);
       addTerminalLog(`> <span class="text-accent-green">Success:</span> Loaded folder [${dirHandle.name}] and its contents.`);
       router.push('/dashboard');
@@ -147,7 +140,7 @@ export default function MenuBar({ onNewFile, onNewFolder }: MenuBarProps) {
           <MenuItem label="Save As..." shortcut="Ctrl+Shift+S" onClick={handleSaveFile} />
           <MenuItem label="Save All" shortcut="Ctrl+K S" onClick={handleSaveFile} />
           <MenuItem divider />
-          <MenuItem label="Exit" onClick={() => handleAction('Exit')} />
+          <MenuItem label="Exit" onClick={() => router.push('/')} />
         </div>
       );
     }
@@ -283,8 +276,8 @@ export default function MenuBar({ onNewFile, onNewFolder }: MenuBarProps) {
     <div ref={menuRef} className="flex h-9 w-full shrink-0 items-center justify-between bg-[#181818] px-2 text-[13px] text-[#cccccc] relative font-sans border-b border-[#2b2b2b] select-none z-50">
       <div className="flex items-center h-full flex-1">
         {/* Logo placeholder */}
-        <div className="flex items-center justify-center w-8 h-full mr-1 cursor-default text-brand-400">
-          <LayoutTemplate size={16} />
+        <div className="flex items-center justify-center w-10 h-full mr-1 cursor-default">
+          <img src="/logo.png" alt="Logo" className="w-8 h-8 object-contain mix-blend-screen" />
         </div>
         {navItems.map((item) => (
           <div

@@ -7,7 +7,7 @@ type ActivityTab = 'Explorer' | 'Planning' | 'Research' | 'Execution' | 'Analysi
 
 export default function Sidebar() {
   const { activeAgent, setActiveAgent, addOpenAgent, toggleWorkflow, isWorkflowOpen, activeProject } = useStore();
-  const [activeTab, setActiveTab] = useState<ActivityTab>('Planning');
+  const [activeTab, setActiveTab] = useState<ActivityTab | null>(null);
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number, y: number } | null>(null);
 

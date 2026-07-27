@@ -199,11 +199,6 @@ export const useStore = create<StoreState>()(
         const newNode: FileSystemNode = { id: Date.now().toString(), name, type: 'file' };
 
         if (!parentId) {
-          if (state.fileSystem.length > 0 && state.fileSystem[0].type === 'folder') {
-            const newFileSystem = [...state.fileSystem];
-            newFileSystem[0] = { ...newFileSystem[0], children: [...(newFileSystem[0].children || []), newNode], isOpen: true };
-            return { fileSystem: newFileSystem };
-          }
           return { fileSystem: [...state.fileSystem, newNode] };
         }
 
@@ -225,11 +220,6 @@ export const useStore = create<StoreState>()(
         const newNode: FileSystemNode = { id: Date.now().toString(), name, type: 'folder', isOpen: false, children: [] };
 
         if (!parentId) {
-          if (state.fileSystem.length > 0 && state.fileSystem[0].type === 'folder') {
-            const newFileSystem = [...state.fileSystem];
-            newFileSystem[0] = { ...newFileSystem[0], children: [...(newFileSystem[0].children || []), newNode], isOpen: true };
-            return { fileSystem: newFileSystem };
-          }
           return { fileSystem: [...state.fileSystem, newNode] };
         }
 

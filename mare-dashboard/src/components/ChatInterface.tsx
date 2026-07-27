@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MessageSquare, Play, Save, Plus, Mic, AudioLines, X, Maximize2, FileText, Bot } from 'lucide-react';
+import { MessageSquare, Play, Save, Plus, Mic, AudioLines, X, Maximize2, FileText, Bot, Trash2 } from 'lucide-react';
 import { useStore, Agent, FileSystemNode } from '@/store/useStore';
 
 interface ChatInterfaceProps {
@@ -122,7 +122,7 @@ const formatMarkdown = (text: string, agentTheme: any) => {
     if (line.trim() === '---') {
       return <hr key={i} className="my-4 border-white/5" />;
     }
-    
+
     let formatted = line
       .replace(/\*\*(.*?)\*\*/g, `<strong class="font-medium text-gray-100">$1</strong>`)
       .replace(/\*(.*?)\*/g, `<em class="italic text-gray-400">$1</em>`)
@@ -137,7 +137,7 @@ const formatMarkdown = (text: string, agentTheme: any) => {
         </div>
       );
     }
-    
+
     const numListMatch = line.match(/^(\d+\.)\s(.*)/);
     if (numListMatch) {
       const remainingFormatted = formatted.replace(/^\d+\.\s/, '');
@@ -163,11 +163,12 @@ const formatMarkdown = (text: string, agentTheme: any) => {
 
 export default function ChatInterface({ agent }: ChatInterfaceProps) {
   const { agentScripts, updateAgentScript, removeOpenAgent, activeAgent, setActiveAgent, runningAgents, setAgentRunning, addTerminalLog, userQuery, selectedFolderId, updateNodeContent, fileSystem } = useStore();
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
   const code = agentScripts[agent] || '';
   const isRunning = runningAgents[agent];
   const scrollRef = useRef<HTMLDivElement>(null);
   const [localQuery, setLocalQuery] = useState('');
-  const [expandedSection, setExpandedSection] = useState<{msgId: string, idx: number} | null>(null);
+  const [expandedSection, setExpandedSection] = useState<{ msgId: string, idx: number } | null>(null);
   const agentTheme = getAgentTheme(agent);
 
   useEffect(() => {
@@ -190,17 +191,35 @@ export default function ChatInterface({ agent }: ChatInterfaceProps) {
   const handleRunAgent = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (isRunning) return;
-    
+
     setAgentRunning(agent, true);
     addTerminalLog(`> Status: <span class="text-accent-yellow">INITIALIZING ${agent.toUpperCase()}...</span>`);
-    
+
     try {
+      const autoWorkflowPrompt = `
+
+IMPORTANT: If your response involves a process, plan, or multiple steps, always include a visual workflow representation at the end of your response. Use the following JSON format inside a markdown json block:
+\`\`\`json
+{
+  "workflow": {
+    "nodes": [
+      { "id": "1", "position": { "x": 100, "y": 100 }, "data": { "label": "Step 1" } },
+      { "id": "2", "position": { "x": 350, "y": 100 }, "data": { "label": "Step 2" } }
+    ],
+    "edges": [
+      { "id": "e1-2", "source": "1", "target": "2", "animated": true }
+    ]
+  }
+}
+\`\`\`
+`;
+
       const response = await fetch('http://localhost:8555/api/agent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           agentName: agent,
-          systemPrompt: agentScripts[agent] || 'You are a helpful AI assistant.',
+          systemPrompt: (agentScripts[agent] || 'You are a helpful AI assistant.') + autoWorkflowPrompt,
           userQuery: localQuery.trim() || userQuery || 'Say hello',
         }),
       });
@@ -216,15 +235,15 @@ export default function ChatInterface({ agent }: ChatInterfaceProps) {
 
       const reader = response.body?.getReader();
       const decoder = new TextDecoder();
-      
+
       let currentScriptCode = agentScripts[agent] || '';
-      
+
       const queryToUse = localQuery.trim() || userQuery || 'Say hello';
       currentScriptCode += `\n\n**You:** ${queryToUse}\n`;
       currentScriptCode += `\n**${agent}:**\n\n`;
       updateAgentScript(agent, currentScriptCode);
       setLocalQuery('');
-      
+
       while (reader) {
         const { value, done } = await reader.read();
         if (done) break;
@@ -235,7 +254,7 @@ export default function ChatInterface({ agent }: ChatInterfaceProps) {
             if (line.startsWith('data:')) {
               const dataStr = line.replace(/^data:/, '').trim();
               if (dataStr === '[DONE]') continue;
-              
+
               try {
                 const parsed = JSON.parse(dataStr);
                 const content = parsed.choices?.[0]?.delta?.content;
@@ -250,7 +269,7 @@ export default function ChatInterface({ agent }: ChatInterfaceProps) {
           }
         }
       }
-      
+
       const jsonBlocks = [...currentScriptCode.matchAll(/```json\s*([\s\S]*?)\s*```/g)];
       for (const match of jsonBlocks) {
         try {
@@ -260,14 +279,14 @@ export default function ChatInterface({ agent }: ChatInterfaceProps) {
             useStore.getState().setWorkflowEdges(parsed.workflow.edges);
             useStore.getState().setWorkflowOpen(true);
             addTerminalLog(`> Status: <span class="text-accent-blue">Generated workflow from response.</span>`);
-            
+
             currentScriptCode = currentScriptCode.replace(match[0], '\n> *[Workflow configuration extracted and rendered in the Multi-Agent Workflow panel]*\n');
             updateAgentScript(agent, currentScriptCode);
             break;
           }
-        } catch (e) {}
+        } catch (e) { }
       }
-      
+
       addTerminalLog(`> Status: <span class="text-accent-green">${agent.toUpperCase()} TASK COMPLETED</span>`);
     } catch (error: any) {
       addTerminalLog(`> <span class="text-accent-red">Error (${agent}):</span> ${error.message}`);
@@ -286,10 +305,10 @@ export default function ChatInterface({ agent }: ChatInterfaceProps) {
       if (selectedNode && selectedNode.type === 'file') {
         updateNodeContent(selectedFolderId, code, agent);
         addTerminalLog(`> <span class="text-accent-green">Success:</span> Saved script to file "${selectedNode.name}".`);
-        
+
         setShowSavePopup(`Saved in file "${selectedNode.name}"`);
         setTimeout(() => setShowSavePopup(null), 3000);
-        
+
         return;
       }
     }
@@ -306,7 +325,7 @@ export default function ChatInterface({ agent }: ChatInterfaceProps) {
       await writable.write(code);
       await writable.close();
       addTerminalLog(`> <span class="text-accent-green">Success:</span> Saved ${agent} response to local file system.`);
-      
+
       setShowSavePopup(`Saved to local file system`);
       setTimeout(() => setShowSavePopup(null), 3000);
     } catch (err: any) {
@@ -319,8 +338,8 @@ export default function ChatInterface({ agent }: ChatInterfaceProps) {
   const isActive = activeAgent === agent;
 
   return (
-    <div 
-      className={`flex flex-1 flex-col rounded-xl border bg-[#1e1e1e] overflow-hidden shadow-lg mx-1 min-w-[300px] transition-all ${isActive ? 'border-brand-500/50 ring-1 ring-brand-500/20' : 'border-[var(--color-border-primary)] opacity-90'}`}
+    <div
+      className={`relative flex flex-1 flex-col rounded-xl border bg-[#1e1e1e] overflow-hidden shadow-lg mx-1 min-w-[300px] transition-all ${isActive ? 'border-brand-500/50 ring-1 ring-brand-500/20' : 'border-[var(--color-border-primary)] opacity-90'}`}
       onClick={() => setActiveAgent(agent)}
     >
       <div className="flex items-center justify-between border-b border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] px-4 py-3 text-sm">
@@ -330,6 +349,13 @@ export default function ChatInterface({ agent }: ChatInterfaceProps) {
           {isActive && <span className="text-xs text-accent-green bg-accent-green/10 px-2 py-0.5 rounded-full ml-1">Active</span>}
         </div>
         <div className="flex items-center gap-3 pb-2 -mb-3">
+          <button
+            onClick={(e) => { e.stopPropagation(); setShowClearConfirm(true); }}
+            className="flex items-center justify-center text-text-tertiary hover:text-accent-red transition-colors cursor-pointer"
+            title="Clear Chat"
+          >
+            <Trash2 size={14} />
+          </button>
           <button
             onClick={handleSave}
             className="flex items-center justify-center text-text-tertiary hover:text-accent-blue transition-colors cursor-pointer"
@@ -345,8 +371,8 @@ export default function ChatInterface({ agent }: ChatInterfaceProps) {
           >
             <Play size={14} fill={isRunning ? "currentColor" : "none"} />
           </button>
-          <span 
-            onClick={(e) => { e.stopPropagation(); removeOpenAgent(agent); }} 
+          <span
+            onClick={(e) => { e.stopPropagation(); removeOpenAgent(agent); }}
             className="cursor-pointer text-text-tertiary hover:text-accent-red transition-colors text-lg leading-none"
             title="Close"
           >
@@ -354,7 +380,7 @@ export default function ChatInterface({ agent }: ChatInterfaceProps) {
           </span>
         </div>
       </div>
-      <div 
+      <div
         ref={scrollRef}
         className="flex-1 overflow-y-auto p-4 text-gray-300 font-sans text-sm whitespace-pre-wrap break-words custom-scrollbar"
         style={{ fontFamily: "Inter, sans-serif", lineHeight: 1.6 }}
@@ -363,7 +389,7 @@ export default function ChatInterface({ agent }: ChatInterfaceProps) {
           const initialText = `# ${agent} Script\n\n# Write your ${agent.toLowerCase()} prompt here...\n`;
           const isLegacyInitialState = code.trim().startsWith('#') && !code.includes('**You:**') && !code.includes(`**${agent}:**`);
           const isInitialState = code.trim() === '' || isLegacyInitialState;
-          
+
           let displayCode = code;
           if (isLegacyInitialState) {
             displayCode = '';
@@ -381,7 +407,7 @@ export default function ChatInterface({ agent }: ChatInterfaceProps) {
                 <p className="text-gray-400 max-w-md text-sm mb-8">
                   {AGENT_CONFIGS[agent]?.description || "I'm your specialized assistant. How can I help you with your tasks today?"}
                 </p>
-                
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 w-full max-w-lg text-left">
                   {(AGENT_CONFIGS[agent]?.prompts || [
                     "Can you explain your capabilities?",
@@ -389,7 +415,7 @@ export default function ChatInterface({ agent }: ChatInterfaceProps) {
                     "Review the current workflow",
                     "What's the status of my project?"
                   ]).map((prompt, i) => (
-                    <button 
+                    <button
                       key={i}
                       onClick={() => setLocalQuery(prompt)}
                       className="p-3 rounded-xl border border-[var(--color-border-primary)] bg-[var(--color-bg-primary)] hover:border-brand-500/50 hover:bg-brand-500/5 transition-all text-xs text-gray-300 flex items-center gap-2 group"
@@ -405,10 +431,10 @@ export default function ChatInterface({ agent }: ChatInterfaceProps) {
 
           const renderAgentResponse = (msgId: string, text: string) => {
             const headingRegex = /^(#{1,6})\s+(.*)$/gm;
-            const sections: {title: string, content: string}[] = [];
+            const sections: { title: string, content: string }[] = [];
             let lastIndex = 0;
             let currentTitle = 'Overview';
-            
+
             let match;
             while ((match = headingRegex.exec(text)) !== null) {
               if (match.index > lastIndex) {
@@ -420,14 +446,14 @@ export default function ChatInterface({ agent }: ChatInterfaceProps) {
               currentTitle = match[2].replace(/\*\*/g, '').trim();
               lastIndex = headingRegex.lastIndex;
             }
-            
+
             if (lastIndex < text.length) {
               const content = text.substring(lastIndex).trim();
               if (content) {
                 sections.push({ title: currentTitle, content });
               }
             }
-            
+
             const finalSections = sections.length > 0 ? sections : [{ title: 'Response', content: text }];
 
             return (
@@ -435,7 +461,7 @@ export default function ChatInterface({ agent }: ChatInterfaceProps) {
                 {finalSections.map((sec, idx) => {
                   const isExpanded = expandedSection?.msgId === msgId && expandedSection?.idx === idx;
                   return (
-                    <div 
+                    <div
                       key={idx}
                       onClick={() => {
                         if (isExpanded) setExpandedSection(null);
@@ -444,7 +470,7 @@ export default function ChatInterface({ agent }: ChatInterfaceProps) {
                       className={`group cursor-pointer ${agentTheme.bg} border ${agentTheme.border} ${agentTheme.hoverBorder} ${agentTheme.hoverBg} rounded-lg transition-all relative overflow-hidden ${isExpanded ? 'col-span-1 md:col-span-2 shadow-lg' : ''}`}
                     >
                       <div className={`absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl ${agentTheme.glow} to-transparent opacity-0 group-hover:opacity-100 transition-opacity`}></div>
-                      
+
                       <div className="px-4 py-3 flex items-center justify-between relative z-10">
                         <h3 className={`text-sm font-medium transition-colors pr-2 ${isExpanded ? agentTheme.text : 'text-gray-200 group-hover:text-white truncate'}`}>
                           {sec.title}
@@ -467,11 +493,11 @@ export default function ChatInterface({ agent }: ChatInterfaceProps) {
           const tokenUser = '**You:**';
           const tokenAgent = `**${agent}:**`;
           const regex = new RegExp(`(${escapeRegExp(tokenUser)}|${escapeRegExp(tokenAgent)})([\\s\\S]*?)(?=(?:${escapeRegExp(tokenUser)}|${escapeRegExp(tokenAgent)}|$))`, 'g');
-          
+
           const messages: any[] = [];
           let match;
           let idCounter = 0;
-          
+
           while ((match = regex.exec(displayCode)) !== null) {
             const isUser = match[1] === tokenUser;
             messages.push({
@@ -482,7 +508,7 @@ export default function ChatInterface({ agent }: ChatInterfaceProps) {
           }
 
           if (messages.length === 0) {
-             return displayCode;
+            return displayCode;
           }
 
           return (
@@ -517,9 +543,9 @@ export default function ChatInterface({ agent }: ChatInterfaceProps) {
           <button className="text-gray-400 hover:text-white transition-colors flex-shrink-0">
             <Plus size={22} strokeWidth={1.5} />
           </button>
-          
-          <input 
-            type="text" 
+
+          <input
+            type="text"
             value={localQuery}
             onChange={(e) => setLocalQuery(e.target.value)}
             onKeyDown={(e) => {
@@ -530,12 +556,12 @@ export default function ChatInterface({ agent }: ChatInterfaceProps) {
             placeholder="Ask anything"
             className="flex-1 bg-transparent text-gray-100 text-sm py-1.5 placeholder-gray-400 focus:outline-none"
           />
-          
+
           <button className="text-gray-400 hover:text-white transition-colors flex-shrink-0">
             <Mic size={18} strokeWidth={1.5} />
           </button>
-          
-          <button 
+
+          <button
             onClick={handleRunAgent}
             disabled={isRunning || !localQuery.trim()}
             className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${isRunning || !localQuery.trim() ? 'bg-[#3a3a3a] text-gray-500 cursor-not-allowed' : 'bg-white text-black hover:bg-gray-200 cursor-pointer'}`}
@@ -551,6 +577,39 @@ export default function ChatInterface({ agent }: ChatInterfaceProps) {
         <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-brand-600 text-white px-4 py-2 rounded-md shadow-lg flex items-center gap-2 z-50 animate-in fade-in slide-in-from-bottom-4 duration-300">
           <Save size={16} />
           <span className="text-sm font-medium">{showSavePopup}</span>
+        </div>
+      )}
+
+      {/* Clear Confirm Modal */}
+      {showClearConfirm && (
+        <div className="absolute inset-0 bg-black/60 z-[100] flex items-center justify-center animate-in fade-in duration-200">
+          <div 
+            className="bg-[#1e1e1e] border border-[var(--color-border-primary)] rounded-xl shadow-2xl p-6 max-w-sm w-full mx-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-medium text-white mb-2">Clear Chat?</h3>
+            <p className="text-gray-400 text-sm mb-6">
+              Are you sure you want to clear this chat? Unsaved progress will be lost and cannot be recovered.
+            </p>
+            <div className="flex items-center justify-end gap-3">
+              <button
+                onClick={(e) => { e.stopPropagation(); setShowClearConfirm(false); }}
+                className="px-4 py-2 text-sm text-gray-300 hover:text-white transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  updateAgentScript(agent, `# ${agent} Script\n\n# Write your ${agent.toLowerCase()} prompt here...\n`);
+                  setShowClearConfirm(false);
+                }}
+                className="px-4 py-2 text-sm bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white rounded-lg transition-colors border border-red-500/20 hover:border-red-500"
+              >
+                Clear Chat
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
