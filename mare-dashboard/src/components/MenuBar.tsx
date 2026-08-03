@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useStore } from '@/store/useStore';
 import { PanelLeft, PanelBottom, PanelRight, LayoutTemplate, Search, Monitor, Settings, UserCircle } from 'lucide-react';
+import { useSession, signOut } from 'next-auth/react';
 
 type MenuState = 'File' | 'Edit' | 'Run' | 'Terminal' | 'Help' | 'Settings' | 'Profile' | null;
 
@@ -14,6 +15,7 @@ interface MenuBarProps {
 
 export default function MenuBar({ onNewFile, onNewFolder, showProfile = false, showSignIn = false }: MenuBarProps) {
   const router = useRouter();
+  const { data: session, status } = useSession();
   const [activeMenu, setActiveMenu] = useState<MenuState>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -258,6 +260,27 @@ export default function MenuBar({ onNewFile, onNewFolder, showProfile = false, s
       );
     }
     if (activeMenu === 'Profile') {
+      if (status === 'authenticated') {
+        return (
+          <div className="absolute top-full right-1 mt-0 py-2 w-64 bg-[#252526] border border-[#3c3c3c] shadow-lg rounded-md z-50">
+            <div className="px-6 py-2 mb-1 flex flex-col gap-1">
+              <div className="text-white font-medium text-sm">{session.user?.name}</div>
+              <div className="text-[#858585] text-xs truncate">{session.user?.email}</div>
+            </div>
+            <MenuItem divider />
+            <div className="px-6 py-2">
+              <div className="text-[#858585] text-[10px] uppercase tracking-wider mb-1 font-semibold">Current Project</div>
+              <div className="text-[#cccccc] text-sm truncate">{useStore.getState().activeProject || 'No Active Project'}</div>
+            </div>
+            <MenuItem divider />
+            <MenuItem label="Sign Out" onClick={() => {
+              useStore.getState().setActiveProject('');
+              signOut({ callbackUrl: '/' });
+            }} />
+          </div>
+        );
+      }
+
       return (
         <div className="absolute top-full right-1 mt-0 py-1 w-56 bg-[#252526] border border-[#3c3c3c] shadow-lg rounded-md z-50">
           <MenuItem label="Sign In to Sync Settings..." onClick={() => handleAction('Sign In')} />
@@ -304,7 +327,7 @@ export default function MenuBar({ onNewFile, onNewFolder, showProfile = false, s
           <div className="p-1 hover:bg-white/10 rounded cursor-pointer"><PanelBottom size={14} /></div>
           <div className="p-1 hover:bg-white/10 rounded cursor-pointer"><PanelRight size={14} /></div>
           <div className="p-1 hover:bg-white/10 rounded cursor-pointer ml-1"><Search size={14} /></div>
-          {showSignIn && (
+          {showSignIn && status !== 'authenticated' && (
             <button
               onClick={() => {
                 useStore.getState().setSignInModalOpen(true);
@@ -314,12 +337,16 @@ export default function MenuBar({ onNewFile, onNewFolder, showProfile = false, s
               Sign In
             </button>
           )}
-          {showProfile && (
+          {(showProfile || status === 'authenticated') && (
             <div 
-              className={`p-1 rounded cursor-pointer ml-1 ${activeMenu === 'Profile' ? 'bg-[#3c3c3c] text-white' : 'hover:bg-white/10'}`}
+              className={`p-1 rounded cursor-pointer ml-1 flex items-center justify-center ${activeMenu === 'Profile' ? 'bg-[#3c3c3c] text-white' : 'hover:bg-white/10'}`}
               onClick={() => setActiveMenu(activeMenu === 'Profile' ? null : 'Profile')}
             >
-              <UserCircle size={14} />
+              {session?.user?.image ? (
+                <img src={session.user.image} alt="Profile" className="w-4 h-4 rounded-full" />
+              ) : (
+                <UserCircle size={14} />
+              )}
             </div>
           )}
         </div>

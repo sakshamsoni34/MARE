@@ -60,14 +60,6 @@ export default function SignInModal() {
             </svg>
             Continue with Google
           </button>
-
-          <button
-            onClick={handleSignIn}
-            className="flex w-full items-center justify-center gap-3 rounded-lg border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-[var(--color-bg-tertiary)]"
-          >
-            <Smartphone className="h-5 w-5 text-text-secondary" />
-            Continue with Phone Number
-          </button>
         </div>
       </div>
     </div>
