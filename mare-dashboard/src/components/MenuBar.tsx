@@ -8,9 +8,11 @@ type MenuState = 'File' | 'Edit' | 'Run' | 'Terminal' | 'Help' | 'Settings' | 'P
 interface MenuBarProps {
   onNewFile: () => void;
   onNewFolder: () => void;
+  showProfile?: boolean;
+  showSignIn?: boolean;
 }
 
-export default function MenuBar({ onNewFile, onNewFolder }: MenuBarProps) {
+export default function MenuBar({ onNewFile, onNewFolder, showProfile = false, showSignIn = false }: MenuBarProps) {
   const router = useRouter();
   const [activeMenu, setActiveMenu] = useState<MenuState>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -302,7 +304,24 @@ export default function MenuBar({ onNewFile, onNewFolder }: MenuBarProps) {
           <div className="p-1 hover:bg-white/10 rounded cursor-pointer"><PanelBottom size={14} /></div>
           <div className="p-1 hover:bg-white/10 rounded cursor-pointer"><PanelRight size={14} /></div>
           <div className="p-1 hover:bg-white/10 rounded cursor-pointer ml-1"><Search size={14} /></div>
-          <div className="p-1 hover:bg-white/10 rounded cursor-pointer ml-1"><UserCircle size={14} /></div>
+          {showSignIn && (
+            <button
+              onClick={() => {
+                useStore.getState().setSignInModalOpen(true);
+              }}
+              className="ml-2 px-3 py-1 bg-brand-500 hover:bg-brand-400 text-white text-xs font-medium rounded shadow-sm transition-colors"
+            >
+              Sign In
+            </button>
+          )}
+          {showProfile && (
+            <div 
+              className={`p-1 rounded cursor-pointer ml-1 ${activeMenu === 'Profile' ? 'bg-[#3c3c3c] text-white' : 'hover:bg-white/10'}`}
+              onClick={() => setActiveMenu(activeMenu === 'Profile' ? null : 'Profile')}
+            >
+              <UserCircle size={14} />
+            </div>
+          )}
         </div>
       </div>
     </div>

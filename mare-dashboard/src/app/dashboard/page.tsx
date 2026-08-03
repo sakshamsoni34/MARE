@@ -26,7 +26,7 @@ export default function Dashboard() {
   const isAnyAgentRunning = Object.values(runningAgents).some(Boolean);
 
   const [mounted, setMounted] = useState(false);
-  
+
   useEffect(() => {
     setMounted(true);
   }, []);
@@ -118,8 +118,11 @@ export default function Dashboard() {
           try {
             const parsed = JSON.parse(match[1]);
             if (parsed.workflow && parsed.workflow.nodes && parsed.workflow.edges) {
-              useStore.getState().setWorkflowNodes(parsed.workflow.nodes);
-              useStore.getState().setWorkflowEdges(parsed.workflow.edges);
+              const uniqueNodes = Array.from(new Map(parsed.workflow.nodes.map((n: any) => [n.id, n])).values());
+              const uniqueEdges = Array.from(new Map(parsed.workflow.edges.map((e: any) => [e.id, e])).values());
+
+              useStore.getState().setWorkflowNodes(uniqueNodes as any);
+              useStore.getState().setWorkflowEdges(uniqueEdges as any);
               useStore.getState().setWorkflowOpen(true);
               addTerminalLog(`> Status: <span class="text-accent-blue">Generated workflow from response.</span>`);
               break;

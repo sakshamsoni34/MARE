@@ -6,6 +6,7 @@ import { Folder, Copy, Activity, Cpu } from 'lucide-react';
 import MenuBar from '@/components/MenuBar';
 import Sidebar from '@/components/Sidebar';
 import ParticleSphere from '@/components/ParticleSphere';
+import SignInModal from '@/components/SignInModal';
 import { useStore } from '@/store/useStore';
 
 export default function RootPage() {
@@ -29,7 +30,7 @@ export default function RootPage() {
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden text-base bg-[var(--color-bg-primary)] select-none">
-      <MenuBar onNewFile={() => { }} onNewFolder={() => { }} />
+      <MenuBar onNewFile={() => { }} onNewFolder={() => { }} showSignIn={true} />
       <div className="flex flex-1 overflow-hidden">
         <Sidebar />
         <div className="flex flex-1 flex-col overflow-hidden">
@@ -54,7 +55,6 @@ export default function RootPage() {
                   }}
                 />
               </div>
-
 
             </main>
           </div>
@@ -90,6 +90,7 @@ export default function RootPage() {
           </div>
         </div>
       </footer>
+      <SignInModal />
     </div>
   );
 }

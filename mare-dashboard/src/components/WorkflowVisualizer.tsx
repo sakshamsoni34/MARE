@@ -45,7 +45,7 @@ export default function WorkflowVisualizer() {
 
   const handleCreateNew = () => {
     setWorkflowNodes([{
-      id: 'start-node-' + Date.now(),
+      id: 'start-node-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9),
       type: 'default',
       position: { x: 250, y: 150 },
       data: { label: 'Start Node' }
@@ -121,7 +121,7 @@ export default function WorkflowVisualizer() {
               onConfirm: (label) => {
                 if (label) {
                   const newNode = {
-                    id: 'node-' + Date.now(),
+                    id: 'node-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9),
                     position,
                     data: { label },
                     type: 'default',

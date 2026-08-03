@@ -32,9 +32,11 @@ interface StoreState {
   userQuery: string;
   fileSystem: FileSystemNode[];
   selectedFolderId: string | null;
+  isSignInModalOpen: boolean;
 
   // Actions
   setActiveProject: (project: string) => void;
+  setSignInModalOpen: (isOpen: boolean) => void;
   setActiveAgent: (agent: Agent) => void;
   addOpenAgent: (agent: Agent) => void;
   removeOpenAgent: (agent: Agent) => void;
@@ -91,8 +93,10 @@ export const useStore = create<StoreState>()(
       userQuery: '',
       fileSystem: initialFileSystem,
       selectedFolderId: null,
+      isSignInModalOpen: false,
 
       setActiveProject: (project) => set({ activeProject: project }),
+      setSignInModalOpen: (isOpen) => set({ isSignInModalOpen: isOpen }),
       setActiveAgent: (agent) => set((state) => {
         if (state.activeAgent === agent) return state;
 
@@ -373,7 +377,9 @@ export const useStore = create<StoreState>()(
     {
       name: 'mare-store',
       partialize: (state) => ({
-        openAgents: state.openAgents
+        openAgents: state.openAgents,
+        activeProject: state.activeProject,
+        projects: state.projects
       })
     }
   )

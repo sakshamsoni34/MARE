@@ -27,7 +27,7 @@ export default function ParticleSphere() {
     const maxParticleCount = 500;
     const r = 800;
     const rHalf = r / 2;
-    
+
     // Bounding Box / Helper
     const helperGeometry = new THREE.IcosahedronGeometry(rHalf * 1.5, 1);
     const helperMaterial = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.1 });
@@ -45,7 +45,7 @@ export default function ParticleSphere() {
       const x = Math.random() * r - r / 2;
       const y = Math.random() * r - r / 2;
       const z = Math.random() * r - r / 2;
-      
+
       // Make them spherical but push them outward to leave the center hollow
       const radius = rHalf * 0.5 + Math.random() * rHalf * 0.7;
       const v = new THREE.Vector3(x, y, z).normalize().multiplyScalar(radius);
