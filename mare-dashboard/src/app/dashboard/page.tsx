@@ -4,7 +4,6 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Play, Bell, Search, Activity, Cpu, Network, ChevronDown } from 'lucide-react';
 import Explorer from '@/components/Explorer';
-import PropertiesPanel from '@/components/PropertiesPanel';
 import TerminalOutput from '@/components/TerminalOutput';
 import CodeEditor from '@/components/CodeEditor';
 import ChatInterface from '@/components/ChatInterface';

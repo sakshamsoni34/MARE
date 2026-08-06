@@ -343,7 +343,7 @@ export default function MenuBar({ onNewFile, onNewFolder, showProfile = false, s
               onClick={() => setActiveMenu(activeMenu === 'Profile' ? null : 'Profile')}
             >
               {session?.user?.image ? (
-                <img src={session.user.image} alt="Profile" className="w-4 h-4 rounded-full" />
+                <img src={session.user.image} alt="Profile" className="w-4 h-4 rounded-full" referrerPolicy="no-referrer" />
               ) : (
                 <UserCircle size={14} />
               )}
