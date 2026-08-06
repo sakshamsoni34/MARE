@@ -11,11 +11,7 @@ import { useStore } from '@/store/useStore';
 
 export default function RootPage() {
   const router = useRouter();
-  const { setActiveProject, runningAgents, fetchProjects } = useStore();
-
-  React.useEffect(() => {
-    fetchProjects();
-  }, [fetchProjects]);
+  const { setActiveProject, runningAgents } = useStore();
 
   const isAnyAgentRunning = Object.values(runningAgents || {}).some(Boolean);
 
