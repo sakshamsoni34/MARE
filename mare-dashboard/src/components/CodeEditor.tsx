@@ -8,7 +8,7 @@ interface CodeEditorProps {
 }
 
 export default function CodeEditor({ agent }: CodeEditorProps) {
-  const { agentScripts, updateAgentScript, removeOpenAgent, activeAgent, setActiveAgent, runningAgents, setAgentRunning, addTerminalLog, userQuery, selectedFolderId, updateNodeContent, fileSystem } = useStore();
+  const { agentScripts, updateAgentScript, removeOpenAgent, activeAgent, setActiveAgent, runningAgents, setAgentRunning, addTerminalLog, userQuery, selectedFolderId, updateNodeContent, fileSystem, createFile } = useStore();
   const code = agentScripts[agent] || '';
   const isRunning = runningAgents[agent];
 
@@ -32,10 +32,10 @@ export default function CodeEditor({ agent }: CodeEditorProps) {
   const handleRunAgent = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (isRunning) return;
-    
+
     setAgentRunning(agent, true);
     addTerminalLog(`> Status: <span class="text-accent-yellow">INITIALIZING ${agent.toUpperCase()}...</span>`);
-    
+
     try {
       const response = await fetch('http://localhost:8555/api/agent', {
         method: 'POST',
@@ -58,11 +58,11 @@ export default function CodeEditor({ agent }: CodeEditorProps) {
 
       const reader = response.body?.getReader();
       const decoder = new TextDecoder();
-      
+
       let currentScriptCode = agentScripts[agent] || '';
       currentScriptCode += `\n\n# --- ${agent} Response ---\n\n`;
       updateAgentScript(agent, currentScriptCode);
-      
+
       while (reader) {
         const { value, done } = await reader.read();
         if (done) break;
@@ -73,7 +73,7 @@ export default function CodeEditor({ agent }: CodeEditorProps) {
             if (line.startsWith('data:')) {
               const dataStr = line.replace(/^data:/, '').trim();
               if (dataStr === '[DONE]') continue;
-              
+
               try {
                 const parsed = JSON.parse(dataStr);
                 const content = parsed.choices?.[0]?.delta?.content;
@@ -88,7 +88,7 @@ export default function CodeEditor({ agent }: CodeEditorProps) {
           }
         }
       }
-      
+
       const jsonBlocks = [...currentScriptCode.matchAll(/```json\s*([\s\S]*?)\s*```/g)];
       for (const match of jsonBlocks) {
         try {
@@ -98,14 +98,14 @@ export default function CodeEditor({ agent }: CodeEditorProps) {
             useStore.getState().setWorkflowEdges(parsed.workflow.edges);
             useStore.getState().setWorkflowOpen(true);
             addTerminalLog(`> Status: <span class="text-accent-blue">Generated workflow from response.</span>`);
-            
+
             currentScriptCode = currentScriptCode.replace(match[0], '\n> *[Workflow configuration extracted and rendered in the Multi-Agent Workflow panel]*\n');
             updateAgentScript(agent, currentScriptCode);
             break;
           }
-        } catch (e) {}
+        } catch (e) { }
       }
-      
+
       addTerminalLog(`> Status: <span class="text-accent-green">${agent.toUpperCase()} TASK COMPLETED</span>`);
     } catch (error: any) {
       addTerminalLog(`> <span class="text-accent-red">Error (${agent}):</span> ${error.message}`);
@@ -125,11 +125,11 @@ export default function CodeEditor({ agent }: CodeEditorProps) {
       if (selectedNode && selectedNode.type === 'file') {
         updateNodeContent(selectedFolderId, code, agent);
         addTerminalLog(`> <span class="text-accent-green">Success:</span> Saved script to file "${selectedNode.name}".`);
-        
+
         // Show popup
         setShowSavePopup(`Saved in file "${selectedNode.name}"`);
         setTimeout(() => setShowSavePopup(null), 3000);
-        
+
         return;
       }
     }
@@ -145,8 +145,12 @@ export default function CodeEditor({ agent }: CodeEditorProps) {
       const writable = await handle.createWritable();
       await writable.write(code);
       await writable.close();
-      addTerminalLog(`> <span class="text-accent-green">Success:</span> Saved ${agent} response to local file system.`);
       
+      // Add it to the virtual file system
+      createFile(selectedFolderId || null, handle.name, code, agent);
+      
+      addTerminalLog(`> <span class="text-accent-green">Success:</span> Saved ${agent} response to local file system.`);
+
       // Show popup
       setShowSavePopup(`Saved to local file system`);
       setTimeout(() => setShowSavePopup(null), 3000);
@@ -160,7 +164,7 @@ export default function CodeEditor({ agent }: CodeEditorProps) {
   const isActive = activeAgent === agent;
 
   return (
-    <div 
+    <div
       className={`flex flex-1 flex-col rounded-xl border bg-[#1e1e1e] overflow-hidden shadow-lg mx-1 min-w-[300px] transition-all ${isActive ? 'border-brand-500/50 ring-1 ring-brand-500/20' : 'border-[var(--color-border-primary)] opacity-90'}`}
       onClick={() => setActiveAgent(agent)}
     >
@@ -186,8 +190,8 @@ export default function CodeEditor({ agent }: CodeEditorProps) {
           >
             <Play size={14} fill={isRunning ? "currentColor" : "none"} />
           </button>
-          <span 
-            onClick={(e) => { e.stopPropagation(); removeOpenAgent(agent); }} 
+          <span
+            onClick={(e) => { e.stopPropagation(); removeOpenAgent(agent); }}
             className="cursor-pointer text-text-tertiary hover:text-accent-red transition-colors text-lg leading-none"
             title="Close"
           >

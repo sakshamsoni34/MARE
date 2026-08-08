@@ -54,7 +54,7 @@ interface StoreState {
   setUserQuery: (query: string) => void;
   createNewProject: (name: string, description?: string, goal?: string, source?: string, priority?: string) => void;
   deleteProject: (name: string) => void;
-  createFile: (parentId: string | null, name: string) => void;
+  createFile: (parentId: string | null, name: string, content?: string, agentName?: Agent) => void;
   createFolder: (parentId: string | null, name: string) => void;
   renameNode: (id: string, newName: string) => void;
   deleteNode: (id: string) => void;
@@ -199,8 +199,8 @@ export const useStore = create<StoreState>()(
           terminalLogs: [...state.terminalLogs, `> Project "${name}" deleted.`]
         };
       }),
-      createFile: (parentId, name) => set((state) => {
-        const newNode: FileSystemNode = { id: Date.now().toString(), name, type: 'file' };
+      createFile: (parentId, name, content, agentName) => set((state) => {
+        const newNode: FileSystemNode = { id: Date.now().toString(), name, type: 'file', content, agentName };
 
         if (!parentId) {
           return { fileSystem: [...state.fileSystem, newNode] };

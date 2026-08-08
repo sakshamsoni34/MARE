@@ -45,9 +45,9 @@ export default function RootPage() {
                 {/* Dark Vignette to separate logo from globe */}
                 <div className="absolute w-[350px] h-[350px] bg-black/60 rounded-full blur-3xl"></div>
                 {/* Crisp White Logo with Mask to hide hard edges */}
-                <img 
-                  src="/logo.png?v=2" 
-                  alt="MARE Logo" 
+                <img
+                  src="/logo.png?v=2"
+                  alt="MARE Logo"
                   className="w-[480px] max-w-[90%] pointer-events-none mix-blend-screen brightness-75 contrast-200 drop-shadow-[0_0_15px_rgba(255,255,255,0.3)] relative z-10"
                   style={{
                     WebkitMaskImage: 'radial-gradient(circle, black 45%, transparent 68%)',
@@ -60,7 +60,7 @@ export default function RootPage() {
           </div>
         </div>
       </div>
-      
+
       {/* Bottom Status Bar */}
       <footer className="flex h-8 shrink-0 items-center justify-between border-t border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] px-4 text-xs font-medium text-text-tertiary w-full">
         <div className="flex items-center gap-6">

@@ -18,7 +18,7 @@ import { X, FilePlus, Save } from 'lucide-react';
 import { useStore } from '@/store/useStore';
 
 export default function WorkflowVisualizer() {
-  const { workflowNodes, setWorkflowNodes, workflowEdges, setWorkflowEdges, toggleWorkflow } = useStore();
+  const { workflowNodes, setWorkflowNodes, workflowEdges, setWorkflowEdges, toggleWorkflow, addTerminalLog, selectedFolderId, createFile } = useStore();
   const [reactFlowInstance, setReactFlowInstance] = React.useState<any>(null);
   const [modalConfig, setModalConfig] = React.useState<{
     isOpen: boolean;
@@ -72,8 +72,33 @@ export default function WorkflowVisualizer() {
       const writable = await handle.createWritable();
       await writable.write(workflowData);
       await writable.close();
+      
+      createFile(selectedFolderId || null, handle.name, workflowData);
+      
+      
+      addTerminalLog(`> <span class="text-accent-green">Success:</span> Saved workflow to local file system.`);
+
+      try {
+        const logResponse = await fetch('http://localhost:8555/api/workflow', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            fileName: handle.name, 
+            nodesCount: workflowNodes.length,
+            edgesCount: workflowEdges.length
+          })
+        });
+        if (logResponse.ok) {
+          const logJson = await logResponse.json();
+          const formattedLog = JSON.stringify(logJson, null, 2).replace(/\n/g, '<br>').replace(/ /g, '&nbsp;');
+          addTerminalLog(`> <span class="text-blue-400">Workflow Save API Response:</span> <br><pre class="text-xs text-gray-300 mt-1">${formattedLog}</pre>`);
+        }
+      } catch (apiErr) {
+        console.error("Failed to call workflow save API:", apiErr);
+      }
     } catch (err: any) {
       if (err.name !== 'AbortError') {
+        addTerminalLog(`> <span class="text-accent-red">Error:</span> Failed to save workflow: ${err.message}`);
         console.error('Failed to save workflow:', err.message);
       }
     }

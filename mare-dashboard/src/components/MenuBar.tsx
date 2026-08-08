@@ -53,8 +53,36 @@ export default function MenuBar({ onNewFile, onNewFolder, showProfile = false, s
 
   const { addTerminalLog, editorCode } = useStore();
 
-  const handleAction = (actionName: string) => {
+  const handleAction = async (actionName: string, folderName?: string) => {
     addTerminalLog(`> <span class="text-text-secondary">Action triggered:</span> ${actionName}`);
+
+    try {
+      const response = await fetch('http://localhost:8555/api/event', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: actionName,
+          folderName: folderName
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`);
+      }
+
+      const jsonResponse = await response.json();
+      // Format the JSON nicely with indentation for the terminal
+      const formattedJson = JSON.stringify(jsonResponse, null, 2)
+        .replace(/\n/g, '<br>')
+        .replace(/ /g, '&nbsp;');
+
+      addTerminalLog(`> <span class="text-blue-400">API Response:</span> <br><pre class="text-xs text-gray-300 mt-1">${formattedJson}</pre>`);
+
+    } catch (error) {
+      addTerminalLog(`> <span class="text-red-400">Error calling API:</span> ${error}`);
+    }
   };
 
   const handleOpenFile = async () => {
@@ -64,6 +92,7 @@ export default function MenuBar({ onNewFile, onNewFolder, showProfile = false, s
       const contents = await file.text();
       useStore.getState().setEditorCode(contents);
       addTerminalLog(`> <span class="text-accent-green">Success:</span> Opened file [${file.name}]`);
+      await handleAction(`Opened file [${file.name}]`);
     } catch (err) {
       addTerminalLog(`> <span class="text-accent-red">Error:</span> Failed to open file`);
     }
@@ -108,6 +137,7 @@ export default function MenuBar({ onNewFile, onNewFolder, showProfile = false, s
       useStore.getState().setFileSystem(children);
       useStore.getState().setActiveProject(dirHandle.name);
       addTerminalLog(`> <span class="text-accent-green">Success:</span> Loaded folder [${dirHandle.name}] and its contents.`);
+      await handleAction("Open Folder", dirHandle.name);
       router.push('/dashboard');
     } catch (err: unknown) {
       if (err instanceof Error && err.name === 'AbortError') return;
@@ -121,7 +151,9 @@ export default function MenuBar({ onNewFile, onNewFolder, showProfile = false, s
       const writable = await fileHandle.createWritable();
       await writable.write(useStore.getState().editorCode);
       await writable.close();
+      useStore.getState().createFile(useStore.getState().selectedFolderId || null, fileHandle.name, useStore.getState().editorCode);
       addTerminalLog(`> <span class="text-accent-green">Success:</span> File saved`);
+      await handleAction(`Saved file`);
     } catch (err) {
       addTerminalLog(`> <span class="text-accent-red">Error:</span> Failed to save file`);
     }
@@ -338,7 +370,7 @@ export default function MenuBar({ onNewFile, onNewFolder, showProfile = false, s
             </button>
           )}
           {(showProfile || status === 'authenticated') && (
-            <div 
+            <div
               className={`p-1 rounded cursor-pointer ml-1 flex items-center justify-center ${activeMenu === 'Profile' ? 'bg-[#3c3c3c] text-white' : 'hover:bg-white/10'}`}
               onClick={() => setActiveMenu(activeMenu === 'Profile' ? null : 'Profile')}
             >

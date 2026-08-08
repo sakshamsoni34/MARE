@@ -162,7 +162,7 @@ const formatMarkdown = (text: string, agentTheme: any) => {
 };
 
 export default function ChatInterface({ agent }: ChatInterfaceProps) {
-  const { agentScripts, updateAgentScript, removeOpenAgent, activeAgent, setActiveAgent, runningAgents, setAgentRunning, addTerminalLog, userQuery, selectedFolderId, updateNodeContent, fileSystem } = useStore();
+  const { agentScripts, updateAgentScript, removeOpenAgent, activeAgent, setActiveAgent, runningAgents, setAgentRunning, addTerminalLog, userQuery, selectedFolderId, updateNodeContent, fileSystem, createFile } = useStore();
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const code = agentScripts[agent] || '';
   const isRunning = runningAgents[agent];
@@ -287,6 +287,27 @@ IMPORTANT: If your response involves a process, plan, or multiple steps, always 
         } catch (e) { }
       }
 
+      // Log the conversation to the new API endpoint
+      try {
+        const fullAgentResponse = currentScriptCode.split(`**${agent}:**\n\n`)[1] || '';
+        const logResponse = await fetch('http://localhost:8555/api/log_chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            agentName: agent,
+            userQuery: queryToUse,
+            agentResponse: fullAgentResponse.trim()
+          })
+        });
+        if (logResponse.ok) {
+          const logJson = await logResponse.json();
+          const formattedLog = JSON.stringify(logJson, null, 2).replace(/\n/g, '<br>').replace(/ /g, '&nbsp;');
+          addTerminalLog(`> <span class="text-blue-400">Chat API Log:</span> <br><pre class="text-xs text-gray-300 mt-1">${formattedLog}</pre>`);
+        }
+      } catch (logErr) {
+        console.error("Failed to log chat:", logErr);
+      }
+
       addTerminalLog(`> Status: <span class="text-accent-green">${agent.toUpperCase()} TASK COMPLETED</span>`);
     } catch (error: any) {
       addTerminalLog(`> <span class="text-accent-red">Error (${agent}):</span> ${error.message}`);
@@ -309,6 +330,21 @@ IMPORTANT: If your response involves a process, plan, or multiple steps, always 
         setShowSavePopup(`Saved in file "${selectedNode.name}"`);
         setTimeout(() => setShowSavePopup(null), 3000);
 
+        try {
+          const logResponse = await fetch('http://localhost:8555/api/saved_files', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fileName: selectedNode.name, agentName: agent })
+          });
+          if (logResponse.ok) {
+            const logJson = await logResponse.json();
+            const formattedLog = JSON.stringify(logJson, null, 2).replace(/\n/g, '<br>').replace(/ /g, '&nbsp;');
+            addTerminalLog(`> <span class="text-blue-400">Save API Response:</span> <br><pre class="text-xs text-gray-300 mt-1">${formattedLog}</pre>`);
+          }
+        } catch (apiErr) {
+          console.error("Failed to call save API:", apiErr);
+        }
+
         return;
       }
     }
@@ -324,10 +360,28 @@ IMPORTANT: If your response involves a process, plan, or multiple steps, always 
       const writable = await handle.createWritable();
       await writable.write(code);
       await writable.close();
+      
+      createFile(selectedFolderId || null, handle.name, code, agent);
+      
       addTerminalLog(`> <span class="text-accent-green">Success:</span> Saved ${agent} response to local file system.`);
 
       setShowSavePopup(`Saved to local file system`);
       setTimeout(() => setShowSavePopup(null), 3000);
+
+      try {
+        const logResponse = await fetch('http://localhost:8555/api/saved_files', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fileName: handle.name, agentName: agent })
+        });
+        if (logResponse.ok) {
+          const logJson = await logResponse.json();
+          const formattedLog = JSON.stringify(logJson, null, 2).replace(/\n/g, '<br>').replace(/ /g, '&nbsp;');
+          addTerminalLog(`> <span class="text-blue-400">Save API Response:</span> <br><pre class="text-xs text-gray-300 mt-1">${formattedLog}</pre>`);
+        }
+      } catch (apiErr) {
+        console.error("Failed to call save API:", apiErr);
+      }
     } catch (err: any) {
       if (err.name !== 'AbortError') {
         addTerminalLog(`> <span class="text-accent-red">Error:</span> Failed to save file: ${err.message}`);
