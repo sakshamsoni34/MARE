@@ -5,7 +5,12 @@ import { useRouter } from 'next/navigation';
 import { Folder, Copy, Activity, Cpu } from 'lucide-react';
 import MenuBar from '@/components/MenuBar';
 import Sidebar from '@/components/Sidebar';
-import ParticleSphere from '@/components/ParticleSphere';
+import dynamic from 'next/dynamic';
+
+const ParticleSphere = dynamic(() => import('@/components/ParticleSphere'), {
+  ssr: false,
+  loading: () => <div className="absolute inset-0 flex items-center justify-center">Loading 3D visualization...</div>
+});
 import SignInModal from '@/components/SignInModal';
 import { useStore } from '@/store/useStore';
 

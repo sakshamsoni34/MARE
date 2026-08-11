@@ -7,7 +7,12 @@ import Explorer from '@/components/Explorer';
 import TerminalOutput from '@/components/TerminalOutput';
 import CodeEditor from '@/components/CodeEditor';
 import ChatInterface from '@/components/ChatInterface';
-import WorkflowVisualizer from '@/components/WorkflowVisualizer';
+import dynamic from 'next/dynamic';
+
+const WorkflowVisualizer = dynamic(() => import('@/components/WorkflowVisualizer'), {
+  ssr: false,
+  loading: () => <div className="flex-1 h-full flex items-center justify-center text-text-tertiary">Loading Workflow...</div>
+});
 import Sidebar from '@/components/Sidebar';
 import MenuBar from '@/components/MenuBar';
 
@@ -15,7 +20,7 @@ import { useStore } from '@/store/useStore';
 
 export default function Dashboard() {
   const router = useRouter();
-  const { runningAgents, setAgentRunning, addTerminalLog, updateLastTerminalLog, clearTerminalLogs, isTerminalOpen, activeAgent, setActiveAgent, openAgents, addOpenAgent, editorCode, updateAgentScript, isWorkflowOpen, toggleWorkflow, userQuery, setUserQuery, selectedFolderId, activeProject } = useStore();
+  const { runningAgents, setAgentRunning, addTerminalLog, updateLastTerminalLog, clearTerminalLogs, isTerminalOpen, isSidebarOpen, isRightSidebarOpen, activeAgent, setActiveAgent, openAgents, addOpenAgent, editorCode, updateAgentScript, isWorkflowOpen, toggleWorkflow, userQuery, setUserQuery, selectedFolderId, activeProject } = useStore();
   const [workflowWidth, setWorkflowWidth] = useState(500);
   const [isAgentDropdownOpen, setIsAgentDropdownOpen] = useState(false);
   const [agentWidths, setAgentWidths] = useState<Record<string, number>>({});
@@ -48,7 +53,7 @@ export default function Dashboard() {
   }, []);
 
   const handleStartResearch = async () => {
-    const agentsToRun = openAgents.filter(agent => !runningAgents[agent]);
+    const agentsToRun = openAgents.filter(agent => !runningAgents[agent] && agent !== 'Orqion');
     if (agentsToRun.length === 0) return;
 
     clearTerminalLogs();
@@ -229,6 +234,11 @@ export default function Dashboard() {
               </div>
               {isTerminalOpen && <TerminalOutput />}
             </main>
+            {isRightSidebarOpen && (
+              <div className="w-[400px] flex-shrink-0 flex flex-col border-l border-[var(--color-border-primary)] bg-[var(--color-bg-primary)] p-2">
+                <ChatInterface agent="Orqion" />
+              </div>
+            )}
           </div>
         </div>
       </div>

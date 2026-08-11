@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MessageSquare, Play, Save, Plus, Mic, AudioLines, X, Maximize2, FileText, Bot, Trash2 } from 'lucide-react';
+import { MessageSquare, Play, Save, Plus, Mic, AudioLines, X, Maximize2, FileText, Bot, Trash2, Send, Loader2 } from 'lucide-react';
 import { useStore, Agent, FileSystemNode } from '@/store/useStore';
 
 interface ChatInterfaceProps {
@@ -94,6 +94,10 @@ const AGENT_CONFIGS: Record<string, { description: string, prompts: string[] }> 
   'Events Agent': {
     description: "I handle system events, triggers, and scheduled tasks in the environment.",
     prompts: ["List active triggers", "Handle this webhook", "Schedule a cron job", "Monitor event stream"]
+  },
+  'Orqion': {
+    description: "I am your general-purpose AI assistant. I can help you with normal daily tasks, writing code, answering questions, and anything else you need.",
+    prompts: ["How do I start?", "Write a Python script", "Summarize this page", "Explain this concept"]
   }
 };
 
@@ -162,7 +166,7 @@ const formatMarkdown = (text: string, agentTheme: any) => {
 };
 
 export default function ChatInterface({ agent }: ChatInterfaceProps) {
-  const { agentScripts, updateAgentScript, removeOpenAgent, activeAgent, setActiveAgent, runningAgents, setAgentRunning, addTerminalLog, userQuery, selectedFolderId, updateNodeContent, fileSystem, createFile } = useStore();
+  const { agentScripts, updateAgentScript, removeOpenAgent, activeAgent, setActiveAgent, runningAgents, setAgentRunning, addTerminalLog, userQuery, selectedFolderId, updateNodeContent, fileSystem, createFile, toggleRightSidebar } = useStore();
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const code = agentScripts[agent] || '';
   const isRunning = runningAgents[agent];
@@ -170,6 +174,17 @@ export default function ChatInterface({ agent }: ChatInterfaceProps) {
   const [localQuery, setLocalQuery] = useState('');
   const [expandedSection, setExpandedSection] = useState<{ msgId: string, idx: number } | null>(null);
   const agentTheme = getAgentTheme(agent);
+
+  const initialText = `# ${agent} Script\n\n# Write your ${agent.toLowerCase()} prompt here...\n`;
+  const isLegacyInitialState = code.trim().startsWith('#') && !code.includes('**You:**') && !code.includes(`**${agent}:**`);
+  const isInitialState = code.trim() === '' || isLegacyInitialState;
+  let displayCode = code;
+  if (isLegacyInitialState) {
+    displayCode = '';
+  } else if (code.startsWith(initialText)) {
+    displayCode = code.substring(initialText.length).trimStart();
+  }
+  const hasMessages = !isInitialState && !!displayCode;
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -186,6 +201,17 @@ export default function ChatInterface({ agent }: ChatInterfaceProps) {
       }
     }
     return undefined;
+  };
+
+  const findParentFolder = (nodes: FileSystemNode[], id: string, parentName: string | null = null): string | null => {
+    for (const node of nodes) {
+      if (node.id === id) return parentName;
+      if (node.children) {
+        const found = findParentFolder(node.children, id, node.type === 'folder' ? node.name : parentName);
+        if (found) return found;
+      }
+    }
+    return null;
   };
 
   const handleRunAgent = async (e: React.MouseEvent) => {
@@ -214,12 +240,43 @@ IMPORTANT: If your response involves a process, plan, or multiple steps, always 
 \`\`\`
 `;
 
+      let systemPromptToUse = agentScripts[agent] || 'You are a helpful AI assistant.';
+      
+      if (agent !== 'Orqion') {
+        systemPromptToUse += autoWorkflowPrompt;
+      } else {
+        systemPromptToUse += `\n\nIMPORTANT: As Orqion, you are a professional AI assistant. You must provide direct, point-to-point responses to the user's queries in a clear and concise manner. Do not generate visual workflows or complex internal structures unless explicitly requested.`;
+      }
+
+      if (agent === 'Orqion') {
+        systemPromptToUse += `\n\nAdditionally, you have the ability to perform UI actions in the dashboard on behalf of the user (e.g., create a file, create a folder, or open an agent). 
+CRITICAL RULE: DO NOT output UI action JSON blocks as examples, and DO NOT output them preemptively. ONLY output a UI action JSON block if the user explicitly requests you to perform that exact action. Keep your answers brief, conversational, and simple. Do not overwhelm the user with complex formatting or unsolicited workflows.
+When explicitly requested to perform an action, use this format:
+\`\`\`json
+{
+  "ui_action": {
+    "type": "create_folder",
+    "name": "folder_name"
+  }
+}
+\`\`\`
+Supported types:
+- "create_folder" (requires "name")
+- "create_file" (requires "name", optional "content")
+- "delete_folder" (requires "name")
+- "delete_file" (requires "name")
+- "open_agent" (requires "agentName", e.g., "Planner Agent")
+- "open_terminal"
+- "open_workflow"
+`;
+      }
+
       const response = await fetch('http://localhost:8555/api/agent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           agentName: agent,
-          systemPrompt: (agentScripts[agent] || 'You are a helpful AI assistant.') + autoWorkflowPrompt,
+          systemPrompt: systemPromptToUse,
           userQuery: localQuery.trim() || userQuery || 'Say hello',
         }),
       });
@@ -284,6 +341,48 @@ IMPORTANT: If your response involves a process, plan, or multiple steps, always 
             updateAgentScript(agent, currentScriptCode);
             break;
           }
+          
+          if (parsed.ui_action) {
+             const action = parsed.ui_action;
+             if (action.type === 'create_folder') {
+                useStore.getState().createFolder(useStore.getState().selectedFolderId || null, action.name);
+                addTerminalLog(`> Status: <span class="text-accent-blue">Orqion created folder: ${action.name}</span>`);
+             } else if (action.type === 'create_file') {
+                useStore.getState().createFile(useStore.getState().selectedFolderId || null, action.name, action.content || '');
+                addTerminalLog(`> Status: <span class="text-accent-blue">Orqion created file: ${action.name}</span>`);
+             } else if (action.type === 'delete_folder' || action.type === 'delete_file') {
+                const fs = useStore.getState().fileSystem;
+                const findNode = (nodes: any[], name: string, type: string): any => {
+                  for (const n of nodes) {
+                    if (n.name === name && n.type === type) return n;
+                    if (n.children) {
+                      const found = findNode(n.children, name, type);
+                      if (found) return found;
+                    }
+                  }
+                  return null;
+                };
+                const targetType = action.type === 'delete_folder' ? 'folder' : 'file';
+                const node = findNode(fs, action.name, targetType);
+                if (node) {
+                  useStore.getState().deleteNode(node.id);
+                  addTerminalLog(`> Status: <span class="text-accent-blue">Orqion deleted ${targetType}: ${action.name}</span>`);
+                } else {
+                  addTerminalLog(`> Error: <span class="text-accent-red">Orqion could not find ${targetType} to delete: ${action.name}</span>`);
+                }
+             } else if (action.type === 'open_agent') {
+                useStore.getState().addOpenAgent(action.agentName);
+                useStore.getState().setActiveAgent(action.agentName);
+                addTerminalLog(`> Status: <span class="text-accent-blue">Orqion opened agent: ${action.agentName}</span>`);
+             } else if (action.type === 'open_terminal') {
+                if (!useStore.getState().isTerminalOpen) useStore.getState().toggleTerminal();
+             } else if (action.type === 'open_workflow') {
+                if (!useStore.getState().isWorkflowOpen) useStore.getState().toggleWorkflow();
+             }
+             
+             currentScriptCode = currentScriptCode.replace(match[0], '\n> *[Action executed successfully by Orqion]*\n');
+             updateAgentScript(agent, currentScriptCode);
+          }
         } catch (e) { }
       }
 
@@ -334,7 +433,7 @@ IMPORTANT: If your response involves a process, plan, or multiple steps, always 
           const logResponse = await fetch('http://localhost:8555/api/saved_files', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ fileName: selectedNode.name, agentName: agent })
+            body: JSON.stringify({ fileName: selectedNode.name, agentName: agent, folderName: findParentFolder(fileSystem, selectedFolderId) || "root" })
           });
           if (logResponse.ok) {
             const logJson = await logResponse.json();
@@ -369,10 +468,11 @@ IMPORTANT: If your response involves a process, plan, or multiple steps, always 
       setTimeout(() => setShowSavePopup(null), 3000);
 
       try {
+        const folderName = selectedFolderId ? (findNode(fileSystem, selectedFolderId)?.type === 'folder' ? findNode(fileSystem, selectedFolderId)?.name : findParentFolder(fileSystem, selectedFolderId)) || "root" : "local";
         const logResponse = await fetch('http://localhost:8555/api/saved_files', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ fileName: handle.name, agentName: agent })
+          body: JSON.stringify({ fileName: handle.name, agentName: agent, folderName })
         });
         if (logResponse.ok) {
           const logJson = await logResponse.json();
@@ -426,7 +526,14 @@ IMPORTANT: If your response involves a process, plan, or multiple steps, always 
             <Play size={14} fill={isRunning ? "currentColor" : "none"} />
           </button>
           <span
-            onClick={(e) => { e.stopPropagation(); removeOpenAgent(agent); }}
+            onClick={(e) => { 
+              e.stopPropagation(); 
+              if (agent === 'Orqion') {
+                toggleRightSidebar();
+              } else {
+                removeOpenAgent(agent); 
+              }
+            }}
             className="cursor-pointer text-text-tertiary hover:text-accent-red transition-colors text-lg leading-none"
             title="Close"
           >
@@ -434,198 +541,219 @@ IMPORTANT: If your response involves a process, plan, or multiple steps, always 
           </span>
         </div>
       </div>
-      <div
-        ref={scrollRef}
-        className="flex-1 overflow-y-auto p-4 text-gray-300 font-sans text-sm whitespace-pre-wrap break-words custom-scrollbar"
-        style={{ fontFamily: "Inter, sans-serif", lineHeight: 1.6 }}
-      >
-        {(() => {
-          const initialText = `# ${agent} Script\n\n# Write your ${agent.toLowerCase()} prompt here...\n`;
-          const isLegacyInitialState = code.trim().startsWith('#') && !code.includes('**You:**') && !code.includes(`**${agent}:**`);
-          const isInitialState = code.trim() === '' || isLegacyInitialState;
+      <div className="flex flex-1 flex-col overflow-hidden relative">
+        
+        {/* Chat History / Initial State Area */}
+        <div
+          ref={scrollRef}
+          className="w-full flex-1 overflow-y-auto p-4 text-gray-300 font-sans text-sm whitespace-pre-wrap break-words custom-scrollbar flex flex-col"
+          style={{ fontFamily: "Inter, sans-serif", lineHeight: 1.6 }}
+        >
+          {!hasMessages ? (
+            <div className="flex-1 flex flex-col items-center justify-center min-h-full animate-in fade-in duration-500 max-w-2xl mx-auto w-full py-8">
+              <div className="w-14 h-14 bg-brand-500/10 rounded-2xl flex items-center justify-center mb-6 ring-1 ring-brand-500/20 shadow-inner">
+                <Bot size={28} className="text-brand-400" />
+              </div>
+              <h1 className="text-2xl font-semibold text-white tracking-tight mb-2">{agent}</h1>
+              <p className="text-gray-400 text-center max-w-md mb-10 text-[13.5px] leading-relaxed">
+                {AGENT_CONFIGS[agent]?.description || "How can I assist you with your tasks today?"}
+              </p>
 
-          let displayCode = code;
-          if (isLegacyInitialState) {
-            displayCode = '';
-          } else if (code.startsWith(initialText)) {
-            displayCode = code.substring(initialText.length).trimStart();
-          }
-
-          if (isInitialState || !displayCode) {
-            return (
-              <div className="flex flex-col items-center justify-center h-full text-center p-6 animate-in fade-in zoom-in duration-500">
-                <div className="w-16 h-16 bg-brand-500/20 rounded-full flex items-center justify-center mb-4 ring-4 ring-brand-500/10">
-                  <MessageSquare size={32} className="text-brand-400" />
-                </div>
-                <h2 className="text-2xl font-bold text-white mb-2">Welcome to {agent}</h2>
-                <p className="text-gray-400 max-w-md text-sm mb-8">
-                  {AGENT_CONFIGS[agent]?.description || "I'm your specialized assistant. How can I help you with your tasks today?"}
-                </p>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 w-full max-w-lg text-left">
-                  {(AGENT_CONFIGS[agent]?.prompts || [
-                    "Can you explain your capabilities?",
-                    "Help me brainstorm some ideas",
-                    "Review the current workflow",
-                    "What's the status of my project?"
-                  ]).map((prompt, i) => (
+              {AGENT_CONFIGS[agent]?.prompts && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full w-full">
+                  {AGENT_CONFIGS[agent].prompts.map((prompt, i) => (
                     <button
                       key={i}
-                      onClick={() => setLocalQuery(prompt)}
-                      className="p-3 rounded-xl border border-[var(--color-border-primary)] bg-[var(--color-bg-primary)] hover:border-brand-500/50 hover:bg-brand-500/5 transition-all text-xs text-gray-300 flex items-center gap-2 group"
+                      onClick={() => {
+                        setLocalQuery(prompt);
+                      }}
+                      className="text-left px-4 py-3 rounded-xl border border-[var(--color-border-primary)] bg-[var(--color-bg-primary)] hover:border-brand-500/40 hover:bg-brand-500/5 transition-all text-[13px] text-gray-300 flex items-start gap-3 group"
                     >
-                      <span className="w-1.5 h-1.5 rounded-full bg-brand-500/50 group-hover:bg-brand-500 group-hover:scale-125 transition-all"></span>
-                      {prompt}
+                      <MessageSquare size={14} className="mt-0.5 text-gray-500 group-hover:text-brand-400 transition-colors shrink-0" />
+                      <span className="leading-snug">{prompt}</span>
                     </button>
                   ))}
                 </div>
-              </div>
-            );
-          }
-
-          const renderAgentResponse = (msgId: string, text: string) => {
-            const headingRegex = /^(#{1,6})\s+(.*)$/gm;
-            const sections: { title: string, content: string }[] = [];
-            let lastIndex = 0;
-            let currentTitle = 'Overview';
-
-            let match;
-            while ((match = headingRegex.exec(text)) !== null) {
-              if (match.index > lastIndex) {
-                const content = text.substring(lastIndex, match.index).trim();
-                if (content) {
-                  sections.push({ title: currentTitle, content });
-                }
-              }
-              currentTitle = match[2].replace(/\*\*/g, '').trim();
-              lastIndex = headingRegex.lastIndex;
-            }
-
-            if (lastIndex < text.length) {
-              const content = text.substring(lastIndex).trim();
-              if (content) {
-                sections.push({ title: currentTitle, content });
-              }
-            }
-
-            const finalSections = sections.length > 0 ? sections : [{ title: 'Response', content: text }];
-
-            return (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 w-full">
-                {finalSections.map((sec, idx) => {
-                  const isExpanded = expandedSection?.msgId === msgId && expandedSection?.idx === idx;
+              )}
+            </div>
+          ) : (
+            (() => {
+              const renderAgentResponse = (msgId: string, text: string) => {
+                if (agent === 'Orqion') {
                   return (
-                    <div
-                      key={idx}
-                      onClick={() => {
-                        if (isExpanded) setExpandedSection(null);
-                        else setExpandedSection({ msgId, idx });
-                      }}
-                      className={`group cursor-pointer ${agentTheme.bg} border ${agentTheme.border} ${agentTheme.hoverBorder} ${agentTheme.hoverBg} rounded-lg transition-all relative overflow-hidden ${isExpanded ? 'col-span-1 md:col-span-2 shadow-lg' : ''}`}
-                    >
-                      <div className={`absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl ${agentTheme.glow} to-transparent opacity-0 group-hover:opacity-100 transition-opacity`}></div>
+                    <div className="text-[14px] text-gray-200 leading-relaxed animate-in fade-in slide-in-from-left-2 duration-300 pl-1">
+                      {formatMarkdown(text, agentTheme)}
+                    </div>
+                  );
+                }
 
-                      <div className="px-4 py-3 flex items-center justify-between relative z-10">
-                        <h3 className={`text-sm font-medium transition-colors pr-2 ${isExpanded ? agentTheme.text : 'text-gray-200 group-hover:text-white truncate'}`}>
-                          {sec.title}
-                        </h3>
-                        <Maximize2 size={14} className={`text-gray-500 transition-transform shrink-0 duration-300 ${isExpanded ? `rotate-180 ${agentTheme.text}` : `opacity-0 group-hover:opacity-100 scale-75 group-hover:scale-100 ${agentTheme.text}`}`} />
-                      </div>
+                const headingRegex = /^(#{1,6})\s+(.*)$/gm;
+                const sections: { title: string, content: string }[] = [];
+                let lastIndex = 0;
+                let currentTitle = 'Overview';
 
-                      {isExpanded && (
-                        <div className="px-4 pb-4 text-[13.5px] text-gray-300 leading-relaxed border-t border-[#333333] pt-3 mt-1 animate-in fade-in slide-in-from-top-2 duration-200">
-                          {formatMarkdown(sec.content, agentTheme)}
+                let match;
+                while ((match = headingRegex.exec(text)) !== null) {
+                  if (match.index > lastIndex) {
+                    const content = text.substring(lastIndex, match.index).trim();
+                    if (content) {
+                      sections.push({ title: currentTitle, content });
+                    }
+                  }
+                  currentTitle = match[2].replace(/\*\*/g, '').trim();
+                  lastIndex = headingRegex.lastIndex;
+                }
+
+                if (lastIndex < text.length) {
+                  const content = text.substring(lastIndex).trim();
+                  if (content) {
+                    sections.push({ title: currentTitle, content });
+                  }
+                }
+
+                const finalSections = sections.length > 0 ? sections : [{ title: 'Response', content: text }];
+
+                return (
+                  <div className="grid grid-cols-1 2xl:grid-cols-2 gap-3 w-full">
+                    {finalSections.map((sec, idx) => {
+                      const isExpanded = expandedSection?.msgId === msgId && expandedSection?.idx === idx;
+                      return (
+                        <div
+                          key={idx}
+                          onClick={() => {
+                            if (isExpanded) setExpandedSection(null);
+                            else setExpandedSection({ msgId, idx });
+                          }}
+                          className={`group cursor-pointer ${agentTheme.bg} border ${agentTheme.border} ${agentTheme.hoverBorder} ${agentTheme.hoverBg} rounded-lg transition-all relative overflow-hidden ${isExpanded ? 'col-span-1 2xl:col-span-2 shadow-md' : ''}`}
+                        >
+                          <div className={`absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl ${agentTheme.glow} to-transparent opacity-0 group-hover:opacity-100 transition-opacity`}></div>
+
+                          <div className="px-4 py-3 flex items-center justify-between relative z-10">
+                            <h3 className={`text-sm font-medium transition-colors pr-2 ${isExpanded ? agentTheme.text : 'text-gray-200 group-hover:text-white truncate'}`}>
+                              {sec.title}
+                            </h3>
+                            <Maximize2 size={14} className={`text-gray-500 transition-transform shrink-0 duration-300 ${isExpanded ? `rotate-180 ${agentTheme.text}` : `opacity-0 group-hover:opacity-100 scale-75 group-hover:scale-100 ${agentTheme.text}`}`} />
+                          </div>
+
+                          {isExpanded && (
+                            <div className="px-4 pb-4 text-[13.5px] text-gray-300 leading-relaxed border-t border-[#333333] pt-3 mt-1 animate-in fade-in slide-in-from-top-2 duration-200">
+                              {formatMarkdown(sec.content, agentTheme)}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              };
+
+              const tokenUser = '**You:**';
+              const tokenAgent = `**${agent}:**`;
+              const regex = new RegExp(`(${escapeRegExp(tokenUser)}|${escapeRegExp(tokenAgent)})([\\s\\S]*?)(?=(?:${escapeRegExp(tokenUser)}|${escapeRegExp(tokenAgent)}|$))`, 'g');
+
+              const messages: any[] = [];
+              let match;
+              let idCounter = 0;
+
+              while ((match = regex.exec(displayCode)) !== null) {
+                const isUser = match[1] === tokenUser;
+                let text = match[2].trim();
+                
+                // Remove duplicate agent name if the LLM accidentally generates it
+                if (!isUser) {
+                  const agentPrefixMatch = text.match(new RegExp(`^\\*\\*${escapeRegExp(agent)}:\\*\\*\\s*`, 'i'));
+                  if (agentPrefixMatch) {
+                    text = text.substring(agentPrefixMatch[0].length).trim();
+                  }
+                }
+
+                messages.push({
+                  id: `msg-${idCounter++}`,
+                  sender: isUser ? 'user' : 'agent',
+                  text: text
+                });
+              }
+
+              if (messages.length === 0) {
+                return displayCode;
+              }
+
+              return (
+                <div className="flex flex-col gap-6 pb-2">
+                  {messages.map((msg) => (
+                    <div key={msg.id} className={`flex flex-col ${msg.sender === 'user' ? 'items-end' : 'items-start'}`}>
+                      {msg.sender === 'user' ? (
+                        <div className="bg-[var(--color-bg-tertiary)] border border-[var(--color-border-primary)] text-gray-100 px-4 py-2.5 rounded-2xl rounded-tr-sm max-w-[85%] text-[13.5px] shadow-sm animate-in fade-in slide-in-from-right-2 duration-300">
+                          {msg.text}
+                        </div>
+                      ) : (
+                        <div className="w-full animate-in fade-in duration-300">
+                          <div className="flex items-center gap-2 mb-2 px-1">
+                            <div className={`w-7 h-7 rounded-lg ${agentTheme.iconBg} border border-white/10 flex items-center justify-center shadow-sm`}>
+                              <Bot size={16} className={agentTheme.iconText} />
+                            </div>
+                            <span className={`text-[11px] font-bold ${agentTheme.text} uppercase tracking-wider`}>{agent}</span>
+                          </div>
+                          {renderAgentResponse(msg.id, msg.text)}
                         </div>
                       )}
                     </div>
-                  );
-                })}
-              </div>
-            );
-          };
-
-          const tokenUser = '**You:**';
-          const tokenAgent = `**${agent}:**`;
-          const regex = new RegExp(`(${escapeRegExp(tokenUser)}|${escapeRegExp(tokenAgent)})([\\s\\S]*?)(?=(?:${escapeRegExp(tokenUser)}|${escapeRegExp(tokenAgent)}|$))`, 'g');
-
-          const messages: any[] = [];
-          let match;
-          let idCounter = 0;
-
-          while ((match = regex.exec(displayCode)) !== null) {
-            const isUser = match[1] === tokenUser;
-            messages.push({
-              id: `msg-${idCounter++}`,
-              sender: isUser ? 'user' : 'agent',
-              text: match[2].trim()
-            });
-          }
-
-          if (messages.length === 0) {
-            return displayCode;
-          }
-
-          return (
-            <div className="flex flex-col gap-6">
-              {messages.map((msg) => (
-                <div key={msg.id} className={`flex flex-col ${msg.sender === 'user' ? 'items-end' : 'items-start'}`}>
-                  {msg.sender === 'user' ? (
-                    <div className="bg-brand-500/20 border border-brand-500/30 text-brand-100 px-4 py-2.5 rounded-2xl rounded-tr-sm max-w-[85%] text-[13.5px] shadow-sm">
-                      {msg.text}
-                    </div>
-                  ) : (
-                    <div className="w-full">
-                      <div className="flex items-center gap-2 mb-3 px-1">
-                        <div className={`w-7 h-7 rounded-lg ${agentTheme.iconBg} border border-white/5 flex items-center justify-center shadow-sm`}>
-                          <Bot size={16} className={agentTheme.iconText} />
-                        </div>
-                        <span className={`text-[11px] font-bold ${agentTheme.text} uppercase tracking-wider`}>{agent}</span>
-                      </div>
-                      {renderAgentResponse(msg.id, msg.text)}
-                    </div>
-                  )}
+                  ))}
                 </div>
-              ))}
+              );
+            })()
+          )}
+        </div>
+
+        {/* Chat Input Area */}
+        <div className="p-4 bg-[var(--color-bg-primary)] border-t border-[var(--color-border-primary)] shrink-0 z-10 w-full relative">
+          <div className="max-w-4xl mx-auto flex flex-col gap-2">
+            <div className="flex items-end bg-[var(--color-bg-secondary)] rounded-xl w-full shadow-sm border border-[var(--color-border-primary)] focus-within:border-brand-500/50 focus-within:ring-1 focus-within:ring-brand-500/50 transition-all overflow-hidden">
+              <button className="text-gray-400 hover:text-gray-200 transition-colors flex-shrink-0 p-3 ml-1" title="Attach file">
+                <Plus size={18} strokeWidth={2} />
+              </button>
+
+              <textarea
+                value={localQuery}
+                onChange={(e) => setLocalQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey && !isRunning) {
+                    e.preventDefault();
+                    if (localQuery.trim()) handleRunAgent(e as any);
+                  }
+                }}
+                placeholder={isRunning ? "Agent is typing..." : `Message ${agent}...`}
+                disabled={isRunning}
+                rows={1}
+                className="flex-1 bg-transparent text-[13.5px] text-gray-200 outline-none placeholder-gray-500 disabled:opacity-50 py-3 resize-none max-h-32 min-h-[44px] custom-scrollbar"
+                autoFocus
+                style={{ height: 'auto' }}
+                onInput={(e) => {
+                  const target = e.target as HTMLTextAreaElement;
+                  target.style.height = 'auto';
+                  target.style.height = `${Math.min(target.scrollHeight, 128)}px`;
+                }}
+              />
+
+              <button
+                onClick={handleRunAgent}
+                disabled={isRunning || !localQuery.trim()}
+                className={`p-2 m-1.5 rounded-lg flex items-center justify-center transition-all flex-shrink-0 ${
+                  isRunning ? 'bg-brand-500/20 text-brand-500' : 
+                  !localQuery.trim() ? 'bg-[var(--color-bg-tertiary)] text-gray-500 cursor-not-allowed' :
+                  'bg-brand-500 hover:bg-brand-400 text-white shadow-sm'
+                }`}
+                title="Send message"
+              >
+                {isRunning ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} className="ml-0.5" />}
+              </button>
             </div>
-          );
-        })()}
-      </div>
-
-      {/* Chat Input Bar */}
-      <div className="p-4 bg-[#1e1e1e] border-t border-[var(--color-border-primary)]">
-        <div className="flex items-center bg-[#2a2a2a] rounded-full px-4 py-2 w-full gap-3 shadow-inner border border-white/5">
-          <button className="text-gray-400 hover:text-white transition-colors flex-shrink-0">
-            <Plus size={22} strokeWidth={1.5} />
-          </button>
-
-          <input
-            type="text"
-            value={localQuery}
-            onChange={(e) => setLocalQuery(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !isRunning) {
-                handleRunAgent(e as any);
-              }
-            }}
-            placeholder="Ask anything"
-            className="flex-1 bg-transparent text-gray-100 text-sm py-1.5 placeholder-gray-400 focus:outline-none"
-          />
-
-          <button className="text-gray-400 hover:text-white transition-colors flex-shrink-0">
-            <Mic size={18} strokeWidth={1.5} />
-          </button>
-
-          <button
-            onClick={handleRunAgent}
-            disabled={isRunning || !localQuery.trim()}
-            className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${isRunning || !localQuery.trim() ? 'bg-[#3a3a3a] text-gray-500 cursor-not-allowed' : 'bg-white text-black hover:bg-gray-200 cursor-pointer'}`}
-            title="Send message"
-          >
-            <AudioLines size={18} strokeWidth={2.5} />
-          </button>
+            <div className="text-center text-[10px] text-gray-500">
+              AI can make mistakes. Verify important information.
+            </div>
+          </div>
         </div>
       </div>
-
       {/* Save Popup */}
       {showSavePopup && (
         <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-brand-600 text-white px-4 py-2 rounded-md shadow-lg flex items-center gap-2 z-50 animate-in fade-in slide-in-from-bottom-4 duration-300">

@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { Node, Edge } from '@xyflow/react';
 
-export type Agent = 'Researcher Agent' | 'Coder Agent' | 'Planner Agent' | 'Executor Agent' | 'Reviewer Agent' | 'Designer Agent' | 'Tester Agent' | 'Task Decomposer Agent' | 'Goal Manager Agent' | 'Web Search Agent' | 'Academic Research Agent' | 'Browser Agent' | 'News Agent' | 'Code Agent' | 'Python Agent' | 'Automation Agent' | 'Data Analysis Agent' | 'Visualization Agent' | 'Validation Agent' | 'Report Generator Agent' | 'Presentation Agent' | 'Export Agent' | 'Live Workflow Agent' | 'Agent Communication Agent' | 'Logs Agent' | 'Events Agent';
+export type Agent = 'Researcher Agent' | 'Coder Agent' | 'Planner Agent' | 'Executor Agent' | 'Reviewer Agent' | 'Designer Agent' | 'Tester Agent' | 'Task Decomposer Agent' | 'Goal Manager Agent' | 'Web Search Agent' | 'Academic Research Agent' | 'Browser Agent' | 'News Agent' | 'Code Agent' | 'Python Agent' | 'Automation Agent' | 'Data Analysis Agent' | 'Visualization Agent' | 'Validation Agent' | 'Report Generator Agent' | 'Presentation Agent' | 'Export Agent' | 'Live Workflow Agent' | 'Agent Communication Agent' | 'Logs Agent' | 'Events Agent' | 'Orqion';
 
 export type FileSystemNode = {
   id: string;
@@ -29,6 +29,8 @@ interface StoreState {
   runningAgents: Record<string, boolean>;
   isTerminalOpen: boolean;
   isWorkflowOpen: boolean;
+  isSidebarOpen: boolean;
+  isRightSidebarOpen: boolean;
   userQuery: string;
   fileSystem: FileSystemNode[];
   selectedFolderId: string | null;
@@ -49,6 +51,8 @@ interface StoreState {
   setWorkflowEdges: (edges: Edge[]) => void;
   setAgentRunning: (agent: string, isRunning: boolean) => void;
   toggleTerminal: () => void;
+  toggleSidebar: () => void;
+  toggleRightSidebar: () => void;
   toggleWorkflow: () => void;
   setWorkflowOpen: (isOpen: boolean) => void;
   setUserQuery: (query: string) => void;
@@ -90,6 +94,8 @@ export const useStore = create<StoreState>()(
       runningAgents: {},
       isTerminalOpen: false,
       isWorkflowOpen: false,
+      isSidebarOpen: true,
+      isRightSidebarOpen: false,
       userQuery: '',
       fileSystem: initialFileSystem,
       selectedFolderId: null,
@@ -99,39 +105,46 @@ export const useStore = create<StoreState>()(
       setSignInModalOpen: (isOpen) => set({ isSignInModalOpen: isOpen }),
       setActiveAgent: (agent) => set((state) => {
         if (state.activeAgent === agent) return state;
-
-        // Save current editor code to the previous agent's script
         const currentAgent = state.activeAgent || 'Researcher Agent';
         const newScripts = { ...state.agentScripts, [currentAgent]: state.editorCode };
-
-        // Load the new agent's script, or default
         const newCode = newScripts[agent] || '';
-
-        return {
-          activeAgent: agent,
-          agentScripts: newScripts,
-          editorCode: newCode
-        };
+        return { activeAgent: agent, agentScripts: newScripts, editorCode: newCode };
       }),
       addOpenAgent: (agent) => set((state) => {
-        if (state.openAgents.includes(agent)) return { activeAgent: agent };
-        const currentScript = state.agentScripts[agent];
-        const newState: Partial<StoreState> = {
-          openAgents: [...state.openAgents, agent],
-          activeAgent: agent
-        };
-        if (currentScript === undefined) {
-          newState.agentScripts = { ...state.agentScripts, [agent]: '' };
+        if (state.openAgents.includes(agent)) {
+          if (state.activeAgent === agent) return state;
+          const currentAgent = state.activeAgent || 'Researcher Agent';
+          const newScripts = { ...state.agentScripts, [currentAgent]: state.editorCode };
+          return { activeAgent: agent, agentScripts: newScripts, editorCode: newScripts[agent] || '' };
         }
-        return newState;
+        
+        const currentAgent = state.activeAgent || 'Researcher Agent';
+        const newScripts = { ...state.agentScripts, [currentAgent]: state.editorCode };
+        if (newScripts[agent] === undefined) {
+          newScripts[agent] = '';
+        }
+        
+        return {
+          openAgents: [...state.openAgents, agent],
+          activeAgent: agent,
+          agentScripts: newScripts,
+          editorCode: newScripts[agent] || ''
+        };
       }),
       removeOpenAgent: (agent) => set((state) => {
         const newOpenAgents = state.openAgents.filter(a => a !== agent);
-        const newState: Partial<StoreState> = { openAgents: newOpenAgents };
-        if (state.activeAgent === agent && newOpenAgents.length > 0) {
-          newState.activeAgent = newOpenAgents[newOpenAgents.length - 1];
+        if (state.activeAgent === agent) {
+          const currentAgent = state.activeAgent || 'Researcher Agent';
+          const newScripts = { ...state.agentScripts, [currentAgent]: state.editorCode };
+          const nextAgent = newOpenAgents.length > 0 ? newOpenAgents[newOpenAgents.length - 1] : null;
+          return {
+            openAgents: newOpenAgents,
+            activeAgent: nextAgent,
+            agentScripts: newScripts,
+            editorCode: nextAgent ? (newScripts[nextAgent] || '') : ''
+          };
         }
-        return newState;
+        return { openAgents: newOpenAgents };
       }),
       addTerminalLog: (log) => set((state) => ({ terminalLogs: [...state.terminalLogs, log] })),
       updateLastTerminalLog: (log) => set((state) => {
@@ -158,6 +171,8 @@ export const useStore = create<StoreState>()(
         runningAgents: { ...state.runningAgents, [agent]: isRunning }
       })),
       toggleTerminal: () => set((state) => ({ isTerminalOpen: !state.isTerminalOpen })),
+      toggleSidebar: () => set((state) => ({ isSidebarOpen: !state.isSidebarOpen })),
+      toggleRightSidebar: () => set((state) => ({ isRightSidebarOpen: !state.isRightSidebarOpen })),
       toggleWorkflow: () => set((state) => ({ isWorkflowOpen: !state.isWorkflowOpen })),
       setWorkflowOpen: (isOpen) => set({ isWorkflowOpen: isOpen }),
       setUserQuery: (query) => set({ userQuery: query }),
@@ -200,7 +215,7 @@ export const useStore = create<StoreState>()(
         };
       }),
       createFile: (parentId, name, content, agentName) => set((state) => {
-        const newNode: FileSystemNode = { id: Date.now().toString(), name, type: 'file', content, agentName };
+        const newNode: FileSystemNode = { id: Date.now().toString() + Math.random().toString(36).substring(2, 9), name, type: 'file', content, agentName };
 
         if (!parentId) {
           return { fileSystem: [...state.fileSystem, newNode] };
@@ -221,7 +236,7 @@ export const useStore = create<StoreState>()(
         return { fileSystem: addNodeToParent(state.fileSystem) };
       }),
       createFolder: (parentId, name) => set((state) => {
-        const newNode: FileSystemNode = { id: Date.now().toString(), name, type: 'folder', isOpen: false, children: [] };
+        const newNode: FileSystemNode = { id: Date.now().toString() + Math.random().toString(36).substring(2, 9), name, type: 'folder', isOpen: false, children: [] };
 
         if (!parentId) {
           return { fileSystem: [...state.fileSystem, newNode] };
@@ -379,7 +394,9 @@ export const useStore = create<StoreState>()(
       partialize: (state) => ({
         openAgents: state.openAgents,
         activeProject: state.activeProject,
-        projects: state.projects
+        projects: state.projects,
+        agentScripts: state.agentScripts,
+        activeAgent: state.activeAgent
       })
     }
   )

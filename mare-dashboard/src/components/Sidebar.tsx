@@ -6,9 +6,8 @@ import Explorer from '@/components/Explorer';
 type ActivityTab = 'Explorer' | 'Planning' | 'Research' | 'Execution' | 'Analysis' | 'Reporting' | 'Monitoring' | 'Projects' | 'Settings';
 
 export default function Sidebar() {
-  const { activeAgent, setActiveAgent, addOpenAgent, toggleWorkflow, isWorkflowOpen, activeProject } = useStore();
-  const [activeTab, setActiveTab] = useState<ActivityTab | null>(null);
-  const [isPanelOpen, setIsPanelOpen] = useState(false);
+  const { activeAgent, setActiveAgent, addOpenAgent, toggleWorkflow, isWorkflowOpen, activeProject, isSidebarOpen, toggleSidebar } = useStore();
+  const [activeTab, setActiveTab] = useState<ActivityTab | null>('Explorer');
   const [contextMenu, setContextMenu] = useState<{ x: number, y: number } | null>(null);
 
   React.useEffect(() => {
@@ -31,10 +30,12 @@ export default function Sidebar() {
 
   const handleTabClick = (tab: ActivityTab) => {
     if (activeTab === tab) {
-      setIsPanelOpen(!isPanelOpen);
+      toggleSidebar();
     } else {
       setActiveTab(tab);
-      setIsPanelOpen(true);
+      if (!isSidebarOpen) {
+        toggleSidebar();
+      }
     }
   };
 
@@ -164,7 +165,7 @@ export default function Sidebar() {
       </aside>
 
       {/* Primary Sidebar (Panel) */}
-      {isPanelOpen && (
+      {isSidebarOpen && activeTab && (
         <aside className="w-56 shrink-0 bg-[var(--color-bg-secondary)] flex flex-col h-full overflow-y-auto custom-scrollbar select-none">
           <div className="px-4 py-3 text-xs font-semibold tracking-wider text-text-primary uppercase border-b border-[var(--color-border-primary)]/50">
             {activeTab}

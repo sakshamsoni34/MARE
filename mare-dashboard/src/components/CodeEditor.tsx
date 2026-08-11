@@ -1,7 +1,13 @@
 import React, { useState } from 'react';
-import Editor from '@monaco-editor/react';
+import dynamic from 'next/dynamic';
 import { Code, Play, Save } from 'lucide-react';
 import { useStore, Agent, FileSystemNode } from '@/store/useStore';
+
+// Dynamically import Monaco Editor to reduce initial bundle size
+const Editor = dynamic(() => import('@monaco-editor/react'), { 
+  ssr: false,
+  loading: () => <div className="w-full h-full flex items-center justify-center text-text-tertiary">Loading Editor...</div>
+});
 
 interface CodeEditorProps {
   agent: Agent;

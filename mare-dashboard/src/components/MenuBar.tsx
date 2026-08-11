@@ -51,7 +51,7 @@ export default function MenuBar({ onNewFile, onNewFolder, showProfile = false, s
     );
   };
 
-  const { addTerminalLog, editorCode } = useStore();
+  const { addTerminalLog, editorCode, toggleSidebar, toggleTerminal, toggleRightSidebar } = useStore();
 
   const handleAction = async (actionName: string, folderName?: string) => {
     addTerminalLog(`> <span class="text-text-secondary">Action triggered:</span> ${actionName}`);
@@ -355,9 +355,9 @@ export default function MenuBar({ onNewFile, onNewFolder, showProfile = false, s
 
       <div className="flex items-center justify-end h-full flex-1 gap-2">
         <div className="flex items-center gap-1 mr-2 text-[#cccccc]">
-          <div className="p-1 hover:bg-white/10 rounded cursor-pointer"><PanelLeft size={14} /></div>
-          <div className="p-1 hover:bg-white/10 rounded cursor-pointer"><PanelBottom size={14} /></div>
-          <div className="p-1 hover:bg-white/10 rounded cursor-pointer"><PanelRight size={14} /></div>
+          <div className="p-1 hover:bg-white/10 rounded cursor-pointer" onClick={toggleSidebar} title="Toggle Left Sidebar"><PanelLeft size={14} /></div>
+          <div className="p-1 hover:bg-white/10 rounded cursor-pointer" onClick={toggleTerminal} title="Toggle Bottom Terminal"><PanelBottom size={14} /></div>
+          <div className="p-1 hover:bg-white/10 rounded cursor-pointer" onClick={toggleRightSidebar} title="Toggle Orqion"><PanelRight size={14} /></div>
           <div className="p-1 hover:bg-white/10 rounded cursor-pointer ml-1"><Search size={14} /></div>
           {showSignIn && status !== 'authenticated' && (
             <button
