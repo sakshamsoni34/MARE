@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useStore } from '@/store/useStore';
-import { PanelLeft, PanelBottom, PanelRight, LayoutTemplate, Search, Monitor, Settings, UserCircle } from 'lucide-react';
+import { PanelLeft, PanelBottom, PanelRight, LayoutTemplate, Search, Monitor, Settings, UserCircle, Bot } from 'lucide-react';
 import { useSession, signOut } from 'next-auth/react';
 
 type MenuState = 'File' | 'Edit' | 'Run' | 'Terminal' | 'Help' | 'Settings' | 'Profile' | null;
@@ -51,7 +51,7 @@ export default function MenuBar({ onNewFile, onNewFolder, showProfile = false, s
     );
   };
 
-  const { addTerminalLog, editorCode, toggleSidebar, toggleTerminal, toggleRightSidebar } = useStore();
+  const { addTerminalLog, editorCode, toggleSidebar, toggleTerminal, toggleRightSidebar, isRightSidebarOpen } = useStore();
 
   const handleAction = async (actionName: string, folderName?: string) => {
     addTerminalLog(`> <span class="text-text-secondary">Action triggered:</span> ${actionName}`);
@@ -357,7 +357,18 @@ export default function MenuBar({ onNewFile, onNewFolder, showProfile = false, s
         <div className="flex items-center gap-1 mr-2 text-[#cccccc]">
           <div className="p-1 hover:bg-white/10 rounded cursor-pointer" onClick={toggleSidebar} title="Toggle Left Sidebar"><PanelLeft size={14} /></div>
           <div className="p-1 hover:bg-white/10 rounded cursor-pointer" onClick={toggleTerminal} title="Toggle Bottom Terminal"><PanelBottom size={14} /></div>
-          <div className="p-1 hover:bg-white/10 rounded cursor-pointer" onClick={toggleRightSidebar} title="Toggle Orqion"><PanelRight size={14} /></div>
+          <button
+            onClick={toggleRightSidebar}
+            className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium transition-all ${
+              isRightSidebarOpen 
+                ? 'bg-brand-500/20 text-brand-400 border border-brand-500/30' 
+                : 'text-[#cccccc] hover:bg-white/10 hover:text-white'
+            }`}
+            title="Toggle Orqion AI Assistant"
+          >
+            <Bot size={13} className={isRightSidebarOpen ? 'text-brand-400' : 'text-[#cccccc]'} />
+            <span>Orqion</span>
+          </button>
           <div className="p-1 hover:bg-white/10 rounded cursor-pointer ml-1"><Search size={14} /></div>
           {showSignIn && status !== 'authenticated' && (
             <button

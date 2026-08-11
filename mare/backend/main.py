@@ -44,16 +44,14 @@ def get_client(request: Request) -> httpx.AsyncClient:
 
 @app.post("/api/agent")
 async def handle_agent_request(body: AgentRequest, client: httpx.AsyncClient = Depends(get_client)):
-    if not MISTRAL_API_KEY:
-        raise HTTPException(status_code=401, detail="MISTRAL_API_KEY is missing. Please check backend configuration.")
-        
+    current_key = os.getenv("MISTRAL_API_KEY", "")
     return StreamingResponse(
         generate_mistral_stream(
             client=client, 
             agent_name=body.agentName, 
             system_prompt_from_ui=body.systemPrompt or "", 
             user_query=body.userQuery, 
-            mistral_api_key=MISTRAL_API_KEY
+            mistral_api_key=current_key
         ),
         media_type="text/event-stream"
     )

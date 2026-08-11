@@ -53,7 +53,7 @@ export default function RootPage() {
                 <img
                   src="/logo.png?v=2"
                   alt="MARE Logo"
-                  className="w-[480px] max-w-[90%] pointer-events-none mix-blend-screen brightness-75 contrast-200 drop-shadow-[0_0_15px_rgba(255,255,255,0.3)] relative z-10"
+                  className="w-[480px] max-w-[90%] pointer-events-none mix-blend-screen brightness-75 contrast-200 drop-shadow-[0_0_15px_rgba(255,255,255,0.3)] relative z-10 -translate-x-6"
                   style={{
                     WebkitMaskImage: 'radial-gradient(circle, black 45%, transparent 68%)',
                     maskImage: 'radial-gradient(circle, black 45%, transparent 68%)'

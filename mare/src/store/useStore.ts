@@ -4,6 +4,14 @@ import { Node, Edge } from '@xyflow/react';
 
 export type Agent = 'Researcher Agent' | 'Coder Agent' | 'Planner Agent' | 'Executor Agent' | 'Reviewer Agent' | 'Designer Agent' | 'Tester Agent' | 'Task Decomposer Agent' | 'Goal Manager Agent' | 'Web Search Agent' | 'Academic Research Agent' | 'Browser Agent' | 'News Agent' | 'Code Agent' | 'Python Agent' | 'Automation Agent' | 'Data Analysis Agent' | 'Visualization Agent' | 'Validation Agent' | 'Report Generator Agent' | 'Presentation Agent' | 'Export Agent' | 'Live Workflow Agent' | 'Agent Communication Agent' | 'Logs Agent' | 'Events Agent' | 'Orqion';
 
+export interface PastConversation {
+  id: string;
+  agent: Agent;
+  title: string;
+  content: string;
+  timestamp: string;
+}
+
 export type FileSystemNode = {
   id: string;
   name: string;
@@ -35,6 +43,7 @@ interface StoreState {
   fileSystem: FileSystemNode[];
   selectedFolderId: string | null;
   isSignInModalOpen: boolean;
+  pastConversations: PastConversation[];
 
   // Actions
   setActiveProject: (project: string) => void;
@@ -68,6 +77,9 @@ interface StoreState {
   setFileSystem: (nodes: FileSystemNode[]) => void;
   setSelectedFolderId: (id: string | null) => void;
   updateNodeContent: (id: string, content: string, agentName?: Agent) => void;
+  savePastConversation: (agent: Agent, content: string) => void;
+  loadPastConversation: (agent: Agent, id: string) => void;
+  deletePastConversation: (id: string) => void;
 }
 
 const initialCode = ``;
@@ -100,6 +112,7 @@ export const useStore = create<StoreState>()(
       fileSystem: initialFileSystem,
       selectedFolderId: null,
       isSignInModalOpen: false,
+      pastConversations: [],
 
       setActiveProject: (project) => set({ activeProject: project }),
       setSignInModalOpen: (isOpen) => set({ isSignInModalOpen: isOpen }),
@@ -388,6 +401,66 @@ export const useStore = create<StoreState>()(
         };
         return { fileSystem: updateInNodes(state.fileSystem) };
       }),
+      savePastConversation: (agent, content) => set((state) => {
+        const initialText = `# ${agent} Script\n\n# Write your ${agent.toLowerCase()} prompt here...\n`;
+        let displayCode = content;
+        if (content.trim().startsWith('#') && !content.includes('**You:**') && !content.includes(`**${agent}:**`)) {
+          displayCode = '';
+        } else if (content.startsWith(initialText)) {
+          displayCode = content.substring(initialText.length).trimStart();
+        }
+        if (!displayCode.trim()) return state;
+
+        const titleMatch = content.match(/\*\*You:\*\*\s*([^\n]+)/);
+        const title = titleMatch ? (titleMatch[1].length > 40 ? titleMatch[1].substring(0, 40) + '...' : titleMatch[1]) : `${agent} Chat`;
+        
+        const newConvo: PastConversation = {
+          id: Date.now().toString() + Math.random().toString(36).substring(2, 9),
+          agent,
+          title,
+          content,
+          timestamp: new Date().toISOString()
+        };
+        return { pastConversations: [...state.pastConversations, newConvo] };
+      }),
+      loadPastConversation: (agent, id) => set((state) => {
+        const convo = state.pastConversations.find(c => c.id === id);
+        if (!convo) return state;
+        
+        const currentCode = state.agentScripts[agent] || '';
+        const initialText = `# ${agent} Script\n\n# Write your ${agent.toLowerCase()} prompt here...\n`;
+        let displayCode = currentCode;
+        if (currentCode.trim().startsWith('#') && !currentCode.includes('**You:**') && !currentCode.includes(`**${agent}:**`)) {
+          displayCode = '';
+        } else if (currentCode.startsWith(initialText)) {
+          displayCode = currentCode.substring(initialText.length).trimStart();
+        }
+        
+        let newPastConvos = state.pastConversations.filter(c => c.id !== id);
+        
+        if (displayCode.trim()) {
+          const titleMatch = currentCode.match(/\*\*You:\*\*\s*([^\n]+)/);
+          const title = titleMatch ? (titleMatch[1].length > 40 ? titleMatch[1].substring(0, 40) + '...' : titleMatch[1]) : `${agent} Chat`;
+          const currentConvo: PastConversation = {
+            id: Date.now().toString() + Math.random().toString(36).substring(2, 9),
+            agent,
+            title,
+            content: currentCode,
+            timestamp: new Date().toISOString()
+          };
+          newPastConvos = [...newPastConvos, currentConvo];
+        }
+
+        const newScripts = { ...state.agentScripts, [agent]: convo.content };
+        return {
+          pastConversations: newPastConvos,
+          agentScripts: newScripts,
+          editorCode: state.activeAgent === agent ? convo.content : state.editorCode
+        };
+      }),
+      deletePastConversation: (id) => set((state) => ({
+        pastConversations: state.pastConversations.filter(c => c.id !== id)
+      })),
     }),
     {
       name: 'mare-store',
@@ -396,7 +469,8 @@ export const useStore = create<StoreState>()(
         activeProject: state.activeProject,
         projects: state.projects,
         agentScripts: state.agentScripts,
-        activeAgent: state.activeAgent
+        activeAgent: state.activeAgent,
+        pastConversations: state.pastConversations
       })
     }
   )

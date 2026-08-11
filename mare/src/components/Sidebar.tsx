@@ -6,7 +6,7 @@ import Explorer from '@/components/Explorer';
 type ActivityTab = 'Explorer' | 'Planning' | 'Research' | 'Execution' | 'Analysis' | 'Reporting' | 'Monitoring' | 'Projects' | 'Settings';
 
 export default function Sidebar() {
-  const { activeAgent, setActiveAgent, addOpenAgent, toggleWorkflow, isWorkflowOpen, activeProject, isSidebarOpen, toggleSidebar } = useStore();
+  const { activeAgent, setActiveAgent, addOpenAgent, toggleWorkflow, isWorkflowOpen, activeProject, isSidebarOpen, toggleSidebar, toggleRightSidebar, isRightSidebarOpen } = useStore();
   const [activeTab, setActiveTab] = useState<ActivityTab | null>('Explorer');
   const [contextMenu, setContextMenu] = useState<{ x: number, y: number } | null>(null);
 

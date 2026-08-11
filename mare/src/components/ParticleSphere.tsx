@@ -94,7 +94,10 @@ export default function ParticleSphere() {
       camera.updateProjectionMatrix();
       renderer.setSize(container.clientWidth, container.clientHeight);
     };
-    window.addEventListener('resize', handleResize);
+    const resizeObserver = new ResizeObserver(() => {
+      handleResize();
+    });
+    resizeObserver.observe(container);
 
     // Animation Loop
     let animationFrameId: number;
@@ -183,7 +186,7 @@ export default function ParticleSphere() {
     animate();
 
     return () => {
-      window.removeEventListener('resize', handleResize);
+      resizeObserver.disconnect();
       cancelAnimationFrame(animationFrameId);
       if (container && container.contains(renderer.domElement)) {
         container.removeChild(renderer.domElement);
