@@ -1,6 +1,6 @@
 # MARE Dashboard
 
-MARE is a full-stack dashboard application featuring an AI-powered chat agent (using Mistral API), a node-based workflow editor, an integrated code editor, and 3D data visualization capabilities.
+MARE is a full-stack dashboard application featuring an AI-powered chat agent , a node-based workflow editor, an integrated code editor, and 3D data visualization capabilities.
 
 ## Features
 
