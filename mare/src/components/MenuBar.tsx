@@ -358,7 +358,22 @@ export default function MenuBar({ onNewFile, onNewFolder, showProfile = false, s
           <div className="p-1 hover:bg-white/10 rounded cursor-pointer" onClick={toggleSidebar} title="Toggle Left Sidebar"><PanelLeft size={14} /></div>
           <div className="p-1 hover:bg-white/10 rounded cursor-pointer" onClick={toggleTerminal} title="Toggle Bottom Terminal"><PanelBottom size={14} /></div>
           <button
-            onClick={toggleRightSidebar}
+            onClick={async () => {
+              toggleRightSidebar();
+              try {
+                await fetch('http://localhost:8555/api/oquiron', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    agentName: 'Orqion',
+                    userQuery: 'Clicked Orqion Chatbot',
+                    agentResponse: 'Opened'
+                  })
+                });
+              } catch (error) {
+                console.error('Failed to call oquiron API', error);
+              }
+            }}
             className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium transition-all ${
               isRightSidebarOpen 
                 ? 'bg-brand-500/20 text-brand-400 border border-brand-500/30' 

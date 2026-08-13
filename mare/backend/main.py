@@ -102,6 +102,25 @@ async def saved_workflow(body: WorkflowRequest):
         "timestamp": datetime.now(timezone.utc).isoformat()
     })
 
+@app.post("/api/oquiron")
+async def oquiron(body : LogChatRequest):
+    return JSONResponse(content={
+        "status" : "success",
+        "message" : f"Oquiron model configured successfully.",
+        "timestamp" : datetime.now(timezone.utc).isoformat(),
+        "userquery" : body.userQuery,
+        "agentResponse" : body.agentResponse
+    })
+
+@app.post("api/Signout")
+async def Signout(body : LogChatRequest):
+    return JSONResponse(content={
+        "status" : "success",
+        "message" : f"Signout successful.",
+        "timestamp" : datetime.now(timezone.utc).isoformat(),
+        "userquery" : body.userQuery,
+        "agentResponse" : body.agentResponse
+    })
 
 if __name__ == "__main__":
     import uvicorn

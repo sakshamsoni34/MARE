@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { signIn } from 'next-auth/react';
 
 export default function SignInModal() {
-  const { isSignInModalOpen, setSignInModalOpen, setActiveProject } = useStore();
+  const { isSignInModalOpen, setSignInModalOpen, setActiveProject, updateAgentScript } = useStore();
   const router = useRouter();
 
   if (!isSignInModalOpen) return null;
@@ -12,11 +12,13 @@ export default function SignInModal() {
   const handleSignIn = () => {
     setSignInModalOpen(false);
     setActiveProject('Default Workspace');
+    updateAgentScript('Orqion', '');
     router.replace('/dashboard');
   };
 
   const handleGoogleSignIn = () => {
     setActiveProject('Default Workspace');
+    updateAgentScript('Orqion', '');
     signIn('google', { callbackUrl: '/dashboard' }, { prompt: 'select_account' });
   };
 
