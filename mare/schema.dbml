@@ -1,0 +1,142 @@
+Project "MARE" {
+  database_type: 'MySQL'
+  Note: 'Production-ready database schema for MARE API Project'
+}
+
+Enum sender_role {
+  user
+  agent
+  system
+}
+
+Enum session_status {
+  active
+  archived
+  deleted
+}
+
+Table users {
+  id bigint [primary key, increment]
+  email varchar(255) [unique, not null]
+  password_hash varchar(255) [not null]
+  first_name varchar(100)
+  last_name varchar(100)
+  is_active boolean [default: true]
+  created_at timestamp [default: `CURRENT_TIMESTAMP`]
+  updated_at timestamp [default: `CURRENT_TIMESTAMP`, note: 'ON UPDATE CURRENT_TIMESTAMP']
+
+  indexes {
+    email
+  }
+}
+
+Table agents {
+  id bigint [primary key, increment]
+  user_id bigint [not null, note: 'Owner of the agent']
+  name varchar(100) [not null]
+  description text
+  system_prompt text
+  model_name varchar(100) [note: 'e.g., mistral-large, oquiron']
+  is_active boolean [default: true]
+  created_at timestamp [default: `CURRENT_TIMESTAMP`]
+  updated_at timestamp [default: `CURRENT_TIMESTAMP`, note: 'ON UPDATE CURRENT_TIMESTAMP']
+
+  indexes {
+    user_id
+    name
+  }
+}
+
+Table chat_sessions {
+  id bigint [primary key, increment]
+  user_id bigint [not null]
+  agent_id bigint [not null]
+  title varchar(255)
+  status session_status [default: 'active']
+  created_at timestamp [default: `CURRENT_TIMESTAMP`]
+  updated_at timestamp [default: `CURRENT_TIMESTAMP`, note: 'ON UPDATE CURRENT_TIMESTAMP']
+
+  indexes {
+    user_id
+    agent_id
+    status
+  }
+}
+
+Table chat_messages {
+  id bigint [primary key, increment]
+  session_id bigint [not null]
+  sender_type sender_role [not null]
+  content text [not null]
+  tokens_used int
+  created_at timestamp [default: `CURRENT_TIMESTAMP`]
+
+  indexes {
+    session_id
+    created_at
+  }
+}
+
+Table workflows {
+  id bigint [primary key, increment]
+  user_id bigint [not null]
+  name varchar(255) [not null]
+  description text
+  file_name varchar(255)
+  nodes_count int [default: 0]
+  edges_count int [default: 0]
+  configuration json
+  is_active boolean [default: true]
+  created_at timestamp [default: `CURRENT_TIMESTAMP`]
+  updated_at timestamp [default: `CURRENT_TIMESTAMP`, note: 'ON UPDATE CURRENT_TIMESTAMP']
+
+  indexes {
+    user_id
+  }
+}
+
+Table saved_files {
+  id bigint [primary key, increment]
+  user_id bigint [not null]
+  agent_id bigint
+  workflow_id bigint
+  folder_name varchar(255) [not null]
+  file_name varchar(255) [not null]
+  file_path varchar(1024) [not null]
+  file_size_bytes bigint
+  mime_type varchar(100)
+  created_at timestamp [default: `CURRENT_TIMESTAMP`]
+  updated_at timestamp [default: `CURRENT_TIMESTAMP`, note: 'ON UPDATE CURRENT_TIMESTAMP']
+
+  indexes {
+    user_id
+    folder_name
+    (folder_name, file_name)
+  }
+}
+
+Table ui_events {
+  id bigint [primary key, increment]
+  user_id bigint
+  action varchar(255) [not null]
+  details json
+  folder_name varchar(255)
+  created_at timestamp [default: `CURRENT_TIMESTAMP`]
+
+  indexes {
+    user_id
+    action
+    created_at
+  }
+}
+
+// Relationships
+Ref: users.id < agents.user_id [delete: cascade]
+Ref: users.id < chat_sessions.user_id [delete: cascade]
+Ref: agents.id < chat_sessions.agent_id [delete: cascade]
+Ref: chat_sessions.id < chat_messages.session_id [delete: cascade]
+Ref: users.id < workflows.user_id [delete: cascade]
+Ref: users.id < saved_files.user_id [delete: cascade]
+Ref: agents.id < saved_files.agent_id [delete: set null]
+Ref: workflows.id < saved_files.workflow_id [delete: set null]
+Ref: users.id < ui_events.user_id [delete: cascade]

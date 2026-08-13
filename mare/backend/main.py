@@ -112,6 +112,20 @@ async def oquiron(body : LogChatRequest):
         "agentResponse" : body.agentResponse
     })
 
+@app.get("/api/db-test")
+async def db_test():
+    try:
+        from database import get_db_connection
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("SHOW TABLES")
+        tables = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        return JSONResponse(content={"status": "success", "tables": tables})
+    except Exception as e:
+        return JSONResponse(content={"status": "error", "message": str(e)}, status_code=500)
+
 @app.post("api/Signout")
 async def Signout(body : LogChatRequest):
     return JSONResponse(content={
