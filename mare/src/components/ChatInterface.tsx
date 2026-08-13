@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MessageSquare, Play, Save, Plus, Mic, AudioLines, X, Maximize2, FileText, Bot, Trash2, Send, Loader2, History, MoreHorizontal } from 'lucide-react';
 import { useStore, Agent, FileSystemNode } from '@/store/useStore';
+import { useSession } from 'next-auth/react';
 
 interface ChatInterfaceProps {
   agent: Agent;
@@ -166,6 +167,8 @@ const formatMarkdown = (text: string, agentTheme: any) => {
 };
 
 export default function ChatInterface({ agent }: ChatInterfaceProps) {
+  const { data: session } = useSession();
+  const userId = (session?.user as any)?.id ? parseInt((session?.user as any)?.id) : undefined;
   const { agentScripts, updateAgentScript, removeOpenAgent, activeAgent, setActiveAgent, runningAgents, setAgentRunning, addTerminalLog, userQuery, selectedFolderId, updateNodeContent, fileSystem, createFile, toggleRightSidebar, pastConversations, savePastConversation, loadPastConversation, deletePastConversation } = useStore();
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const code = agentScripts[agent] || '';
@@ -420,7 +423,8 @@ Supported types:
           body: JSON.stringify({
             agentName: agent,
             userQuery: queryToUse,
-            agentResponse: fullAgentResponse.trim()
+            agentResponse: fullAgentResponse.trim(),
+            userId: userId
           })
         });
         if (logResponse.ok) {
@@ -458,7 +462,7 @@ Supported types:
           const logResponse = await fetch('http://localhost:8555/api/saved_files', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ fileName: selectedNode.name, agentName: agent, folderName: findParentFolder(fileSystem, selectedFolderId) || "root" })
+            body: JSON.stringify({ fileName: selectedNode.name, agentName: agent, folderName: findParentFolder(fileSystem, selectedFolderId) || "root", userId: userId })
           });
           if (logResponse.ok) {
             const logJson = await logResponse.json();
@@ -497,7 +501,7 @@ Supported types:
         const logResponse = await fetch('http://localhost:8555/api/saved_files', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ fileName: handle.name, agentName: agent, folderName })
+          body: JSON.stringify({ fileName: handle.name, agentName: agent, folderName, userId: userId })
         });
         if (logResponse.ok) {
           const logJson = await logResponse.json();
@@ -526,6 +530,13 @@ Supported types:
           <span className="font-medium text-[15px] text-blue-400">{agent === 'Orqion' ? 'Orqion' : agent}</span>
         </div>
         <div className="flex items-center gap-5 text-gray-400">
+          <button
+            onClick={handleSave}
+            className="flex items-center justify-center hover:text-white transition-colors cursor-pointer"
+            title="Save"
+          >
+            <Save size={18} strokeWidth={2} />
+          </button>
           <button
             onClick={(e) => { 
               e.stopPropagation(); 

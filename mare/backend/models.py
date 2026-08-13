@@ -15,13 +15,16 @@ class LogChatRequest(BaseModel):
     agentName: str = "unknown"
     userQuery: str = ""
     agentResponse: str = ""
+    userId: Optional[int] = None
 
 class SavedFilesRequest(BaseModel):
     fileName: str = "unknown"
     agentName: str = "unknown"
     folderName: Optional[str] = "unknown"
+    userId: Optional[int] = None
 
 class WorkflowRequest(BaseModel):
     fileName: str = "unknown"
     nodesCount: int = 0
     edgesCount: int = 0
+    userId: Optional[int] = None
