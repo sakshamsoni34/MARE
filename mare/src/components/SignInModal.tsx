@@ -11,15 +11,13 @@ export default function SignInModal() {
 
   const handleSignIn = () => {
     setSignInModalOpen(false);
-    setActiveProject('Default Workspace');
     updateAgentScript('Orqion', '');
-    router.replace('/dashboard');
+    // Remove auto-assignment and routing, keeping them on the page to select folder
   };
 
   const handleGoogleSignIn = () => {
-    setActiveProject('Default Workspace');
     updateAgentScript('Orqion', '');
-    signIn('google', { callbackUrl: '/dashboard' }, { prompt: 'select_account' });
+    signIn('google', { callbackUrl: '/' }, { prompt: 'select_account' });
   };
 
   return (

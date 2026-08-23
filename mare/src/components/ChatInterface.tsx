@@ -129,16 +129,23 @@ const formatMarkdown = (text: string, agentTheme: any) => {
     }
 
     let formatted = line
-      .replace(/\*\*(.*?)\*\*/g, `<strong class="font-medium text-gray-100">$1</strong>`)
+      .replace(/\*\*(.*?)\*\*/g, `<strong class="${agentTheme.text} font-semibold tracking-wide">$1</strong>`)
       .replace(/\*(.*?)\*/g, `<em class="italic text-gray-400">$1</em>`)
-      .replace(/`(.*?)`/g, `<code class="bg-black/40 px-1.5 py-0.5 rounded text-[12px] font-mono text-gray-300 border border-white/5">$1</code>`)
-      .replace(/\[(.*?)\]\((.*?)\)/g, `<a href="$2" target="_blank" class="${agentTheme.text} hover:underline">$1</a>`);
+      .replace(/`(.*?)`/g, `<code class="${agentTheme.bg} ${agentTheme.text} px-1.5 py-0.5 rounded text-[12px] font-mono border ${agentTheme.border} shadow-sm">$1</code>`)
+      .replace(/\[(.*?)\]\((.*?)\)/g, `<a href="$2" target="_blank" class="${agentTheme.text} hover:underline underline-offset-2 decoration-${agentTheme.text.split('-')[1]}-500/30">$1</a>`)
+      .replace(/^(#{1,6})\s+(.*)$/g, (match, hashes, title) => {
+         const size = Math.max(16 - (hashes.length * 1), 13);
+         return `<div class="font-semibold text-white mt-4 mb-2 tracking-tight flex items-center gap-2" style="font-size: ${size}px;">
+           <div class="w-1.5 h-1.5 rounded-sm ${agentTheme.iconBg}"></div>
+           ${title}
+         </div>`;
+      });
 
     if (line.trim().startsWith('- ')) {
       return (
-        <div key={i} className="flex gap-3 my-1.5 items-start">
-          <span className={`${agentTheme.text} mt-1.5 text-[8px]`}>●</span>
-          <span dangerouslySetInnerHTML={{ __html: formatted.substring(2) }} />
+        <div key={i} className="flex gap-3 my-1.5 items-start group">
+          <div className={`mt-2 shrink-0 w-1.5 h-1.5 rounded-sm rotate-45 transition-transform group-hover:scale-125 ${agentTheme.bg} border ${agentTheme.border}`}></div>
+          <span dangerouslySetInnerHTML={{ __html: formatted.substring(2) }} className="text-gray-300" />
         </div>
       );
     }
@@ -147,29 +154,34 @@ const formatMarkdown = (text: string, agentTheme: any) => {
     if (numListMatch) {
       const remainingFormatted = formatted.replace(/^\d+\.\s/, '');
       return (
-        <div key={i} className="flex gap-2 my-1.5 items-start">
-          <span className={`${agentTheme.text} font-medium`}>{numListMatch[1]}</span>
-          <span dangerouslySetInnerHTML={{ __html: remainingFormatted }} />
+        <div key={i} className="flex gap-2.5 my-2 items-start group">
+          <span className={`shrink-0 flex items-center justify-center w-5 h-5 rounded-md text-[10px] font-bold ${agentTheme.bg} ${agentTheme.text} border ${agentTheme.border} shadow-sm transition-all group-hover:shadow-md`}>
+            {numListMatch[1].replace('.', '')}
+          </span>
+          <span dangerouslySetInnerHTML={{ __html: remainingFormatted }} className="text-gray-300 mt-0.5" />
         </div>
       );
     }
 
-    if (line.trim() === '') return <div key={i} className="h-1.5"></div>;
+    if (line.trim() === '') return <div key={i} className="h-2"></div>;
 
     if (line.trim().startsWith('>')) {
       return (
-        <div key={i} className={`border-l-2 ${agentTheme.border} pl-3 my-2 text-gray-400 italic bg-black/20 p-2 rounded-r-md`} dangerouslySetInnerHTML={{ __html: formatted.replace(/^>\s?/, '') }}></div>
+        <div key={i} className={`relative overflow-hidden border-l-2 ${agentTheme.border} pl-4 py-2.5 my-3 text-gray-300/90 italic ${agentTheme.bg} rounded-r-lg`}>
+          <div className={`absolute top-0 right-0 w-16 h-16 bg-gradient-to-bl ${agentTheme.glow} to-transparent opacity-30`}></div>
+          <span dangerouslySetInnerHTML={{ __html: formatted.replace(/^>\s?/, '') }}></span>
+        </div>
       );
     }
 
-    return <div key={i} dangerouslySetInnerHTML={{ __html: formatted }} className="my-1" />;
+    return <div key={i} dangerouslySetInnerHTML={{ __html: formatted }} className="my-1.5" />;
   });
 };
 
 export default function ChatInterface({ agent }: ChatInterfaceProps) {
   const { data: session } = useSession();
   const userId = (session?.user as any)?.id ? parseInt((session?.user as any)?.id) : undefined;
-  const { agentScripts, updateAgentScript, removeOpenAgent, activeAgent, setActiveAgent, runningAgents, setAgentRunning, addTerminalLog, userQuery, selectedFolderId, updateNodeContent, fileSystem, createFile, toggleRightSidebar, pastConversations, savePastConversation, loadPastConversation, deletePastConversation } = useStore();
+  const { agentScripts, updateAgentScript, removeOpenAgent, activeAgent, setActiveAgent, runningAgents, setAgentRunning, addTerminalLog, userQuery, selectedFolderId, updateNodeContent, fileSystem, createFile, toggleRightSidebar, pastConversations, savePastConversation, loadPastConversation, deletePastConversation, hubSelectedAgents, toggleHubSelectedAgent } = useStore();
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const code = agentScripts[agent] || '';
   const isRunning = runningAgents[agent];
@@ -281,6 +293,65 @@ Supported types:
 
       const queryToUse = localQuery.trim() || userQuery || 'Say hello';
       setLocalQuery('');
+
+      let currentScriptCode = agentScripts[agent] || '';
+      currentScriptCode += `\n\n**You:** ${queryToUse}\n`;
+      updateAgentScript(agent, currentScriptCode);
+
+      if (agent === 'Multi-Agent Hub') {
+         let accumulatedContext = `User requested: ${queryToUse}\n\n`;
+         for (const subAgent of hubSelectedAgents) {
+            currentScriptCode += `\n**${subAgent}:**\n\n`;
+            updateAgentScript(agent, currentScriptCode);
+            addTerminalLog(`> Status: <span class="text-accent-yellow">HUB: Executing ${subAgent}...</span>`);
+
+            let hubSystemPrompt = (AGENT_CONFIGS[subAgent]?.description || 'You are a helpful AI.') + autoWorkflowPrompt + `\n\n[CONTEXT FROM PREVIOUS AGENTS]\n${accumulatedContext}\nPlease build upon the previous responses to accomplish the user's request.`;
+            
+            const response = await fetch('http://localhost:8555/api/agent', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                agentName: subAgent,
+                systemPrompt: hubSystemPrompt,
+                userQuery: queryToUse,
+              }),
+            });
+
+            if (!response.ok) {
+              addTerminalLog(`> <span class="text-accent-red">Hub Error (${subAgent}):</span> Failed to fetch.`);
+              continue;
+            }
+
+            const reader = response.body?.getReader();
+            const decoder = new TextDecoder();
+            let subAgentOutput = "";
+
+            while (reader) {
+              const { value, done } = await reader.read();
+              if (done) break;
+              if (value) {
+                const chunkStr = decoder.decode(value, { stream: true });
+                const lines = chunkStr.split('\n').filter((line) => line.trim() !== '');
+                for (const line of lines) {
+                  if (line.startsWith('data:')) {
+                    const dataStr = line.replace(/^data:/, '').trim();
+                    if (dataStr === '[DONE]') continue;
+                    try {
+                      const parsed = JSON.parse(dataStr);
+                      const content = parsed.choices?.[0]?.delta?.content;
+                      if (content) {
+                        currentScriptCode += content;
+                        subAgentOutput += content;
+                        updateAgentScript(agent, currentScriptCode);
+                      }
+                    } catch (e) { }
+                  }
+                }
+              }
+            }
+            accumulatedContext += `\n\n--- [Output from ${subAgent}] ---\n${subAgentOutput}\n`;
+         }
+      } else {
 
       const response = await fetch('http://localhost:8555/api/agent', {
         method: 'POST',
@@ -413,6 +484,8 @@ Supported types:
           }
         } catch (e) { }
       }
+      
+      } // end else for single agent processing
 
       // Log the conversation to the new API endpoint
       try {
@@ -597,8 +670,8 @@ Supported types:
                 {AGENT_CONFIGS[agent]?.description || "How can I assist you with your tasks today?"}
               </p>
 
-              {AGENT_CONFIGS[agent]?.prompts && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full w-full">
+              {AGENT_CONFIGS[agent]?.prompts && agent !== 'Multi-Agent Hub' && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full">
                   {AGENT_CONFIGS[agent].prompts.map((prompt, i) => (
                     <button
                       key={i}
@@ -613,101 +686,56 @@ Supported types:
                   ))}
                 </div>
               )}
+
+              {agent === 'Multi-Agent Hub' && (
+                <div className="w-full mt-6 mb-4 max-w-2xl">
+                  <h3 className="text-gray-300 text-sm font-medium mb-4 text-center">Select Collaborating Agents</h3>
+                  <div className="flex flex-wrap justify-center gap-2">
+                    {Object.keys(AGENT_CONFIGS).filter(a => a !== 'Orqion' && a !== 'Multi-Agent Hub').map(a => (
+                      <button
+                        key={a}
+                        onClick={() => toggleHubSelectedAgent(a as Agent)}
+                        className={`px-3 py-1.5 rounded-full text-[12px] transition-all border ${
+                          hubSelectedAgents.includes(a as Agent)
+                            ? 'bg-brand-500/20 border-brand-500/50 text-brand-400 font-medium'
+                            : 'bg-[var(--color-bg-primary)] border-[var(--color-border-primary)] text-gray-400 hover:border-gray-500 hover:text-gray-300'
+                        }`}
+                      >
+                        {a.replace(' Agent', '')}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             (() => {
-              const renderAgentResponse = (msgId: string, text: string) => {
-                if (agent === 'Orqion') {
-                  return (
-                    <div className="text-[14px] text-gray-200 leading-relaxed animate-in fade-in slide-in-from-left-2 duration-300 pl-1">
-                      {formatMarkdown(text, agentTheme)}
-                    </div>
-                  );
-                }
-
-                const headingRegex = /^(#{1,6})\s+(.*)$/gm;
-                const sections: { title: string, content: string }[] = [];
-                let lastIndex = 0;
-                let currentTitle = 'Overview';
-
-                let match;
-                while ((match = headingRegex.exec(text)) !== null) {
-                  if (match.index > lastIndex) {
-                    const content = text.substring(lastIndex, match.index).trim();
-                    if (content) {
-                      sections.push({ title: currentTitle, content });
-                    }
-                  }
-                  currentTitle = match[2].replace(/\*\*/g, '').trim();
-                  lastIndex = headingRegex.lastIndex;
-                }
-
-                if (lastIndex < text.length) {
-                  const content = text.substring(lastIndex).trim();
-                  if (content) {
-                    sections.push({ title: currentTitle, content });
-                  }
-                }
-
-                const finalSections = sections.length > 0 ? sections : [{ title: 'Response', content: text }];
-
+              const renderAgentResponse = (msgId: string, text: string, msgAgentTheme: any) => {
                 return (
-                  <div className="grid grid-cols-1 2xl:grid-cols-2 gap-3 w-full">
-                    {finalSections.map((sec, idx) => {
-                      const isExpanded = expandedSection?.msgId === msgId && expandedSection?.idx === idx;
-                      return (
-                        <div
-                          key={idx}
-                          onClick={() => {
-                            if (isExpanded) setExpandedSection(null);
-                            else setExpandedSection({ msgId, idx });
-                          }}
-                          className={`group cursor-pointer ${agentTheme.bg} border ${agentTheme.border} ${agentTheme.hoverBorder} ${agentTheme.hoverBg} rounded-lg transition-all relative overflow-hidden ${isExpanded ? 'col-span-1 2xl:col-span-2 shadow-md' : ''}`}
-                        >
-                          <div className={`absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl ${agentTheme.glow} to-transparent opacity-0 group-hover:opacity-100 transition-opacity`}></div>
-
-                          <div className="px-4 py-3 flex items-center justify-between relative z-10">
-                            <h3 className={`text-sm font-medium transition-colors pr-2 ${isExpanded ? agentTheme.text : 'text-gray-200 group-hover:text-white truncate'}`}>
-                              {sec.title}
-                            </h3>
-                            <Maximize2 size={14} className={`text-gray-500 transition-transform shrink-0 duration-300 ${isExpanded ? `rotate-180 ${agentTheme.text}` : `opacity-0 group-hover:opacity-100 scale-75 group-hover:scale-100 ${agentTheme.text}`}`} />
-                          </div>
-
-                          {isExpanded && (
-                            <div className="px-4 pb-4 text-[13.5px] text-gray-300 leading-relaxed border-t border-[#333333] pt-3 mt-1 animate-in fade-in slide-in-from-top-2 duration-200">
-                              {formatMarkdown(sec.content, agentTheme)}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
+                  <div className={`relative mt-2 pl-4 py-2 before:absolute before:left-0 before:top-0 before:bottom-0 before:w-[2px] before:rounded-full before:bg-gradient-to-b ${msgAgentTheme.glow} before:to-transparent animate-in fade-in slide-in-from-left-2 duration-500`}>
+                    <div className={`absolute -left-1.5 top-0 w-3 h-3 rounded-full ${msgAgentTheme.iconBg} border border-white/20 shadow-[0_0_10px_rgba(255,255,255,0.1)]`} style={{ boxShadow: `0 0 10px var(--tw-shadow-color)` }}></div>
+                    <div className="text-[13.5px] text-gray-200 leading-[1.7] tracking-wide">
+                      {formatMarkdown(text, msgAgentTheme)}
+                    </div>
                   </div>
                 );
               };
 
-              const tokenUser = '**You:**';
-              const tokenAgent = `**${agent}:**`;
-              const regex = new RegExp(`(${escapeRegExp(tokenUser)}|${escapeRegExp(tokenAgent)})([\\s\\S]*?)(?=(?:${escapeRegExp(tokenUser)}|${escapeRegExp(tokenAgent)}|$))`, 'g');
+              const regex = new RegExp(`\\*\\*(You|[A-Za-z0-9 -]+):\\*\\*([\\s\\S]*?)(?=(?:\\*\\*(?:You|[A-Za-z0-9 -]+):\\*\\*|$))`, 'g');
 
               const messages: any[] = [];
               let match;
               let idCounter = 0;
 
               while ((match = regex.exec(displayCode)) !== null) {
-                const isUser = match[1] === tokenUser;
+                const senderName = match[1];
+                const isUser = senderName === 'You';
                 let text = match[2].trim();
                 
-                // Remove duplicate agent name if the LLM accidentally generates it
-                if (!isUser) {
-                  const agentPrefixMatch = text.match(new RegExp(`^\\*\\*${escapeRegExp(agent)}:\\*\\*\\s*`, 'i'));
-                  if (agentPrefixMatch) {
-                    text = text.substring(agentPrefixMatch[0].length).trim();
-                  }
-                }
-
                 messages.push({
                   id: `msg-${idCounter++}`,
                   sender: isUser ? 'user' : 'agent',
+                  senderName: senderName,
                   text: text
                 });
               }
@@ -718,7 +746,9 @@ Supported types:
 
               return (
                 <div className="flex flex-col gap-6 pb-2">
-                  {messages.map((msg) => (
+                  {messages.map((msg) => {
+                    const msgAgentTheme = getAgentTheme(msg.senderName);
+                    return (
                     <div key={msg.id} className={`flex flex-col ${msg.sender === 'user' ? 'items-end' : 'items-start'}`}>
                       {msg.sender === 'user' ? (
                         <div className="bg-[var(--color-bg-tertiary)] border border-[var(--color-border-primary)] text-gray-100 px-4 py-2.5 rounded-2xl rounded-tr-sm max-w-[85%] text-[13.5px] shadow-sm animate-in fade-in slide-in-from-right-2 duration-300">
@@ -727,16 +757,36 @@ Supported types:
                       ) : (
                         <div className="w-full animate-in fade-in duration-300">
                           <div className="flex items-center gap-2 mb-2 px-1">
-                            <div className={`w-7 h-7 rounded-lg ${agentTheme.iconBg} border border-white/10 flex items-center justify-center shadow-sm`}>
-                              <Bot size={16} className={agentTheme.iconText} />
+                            <div className={`w-7 h-7 rounded-lg ${msgAgentTheme.iconBg} border border-white/10 flex items-center justify-center shadow-sm`}>
+                              <Bot size={16} className={msgAgentTheme.iconText} />
                             </div>
-                            <span className={`text-[11px] font-bold ${agentTheme.text} uppercase tracking-wider`}>{agent}</span>
+                            <span className={`text-[11px] font-bold ${msgAgentTheme.text} uppercase tracking-wider`}>{msg.senderName}</span>
                           </div>
-                          {renderAgentResponse(msg.id, msg.text)}
+                          {renderAgentResponse(msg.id, msg.text, msgAgentTheme)}
                         </div>
                       )}
                     </div>
-                  ))}
+                  )})}
+                  
+                  {isRunning && messages[messages.length - 1]?.sender === 'user' && (
+                    <div className="flex flex-col items-start animate-in fade-in slide-in-from-bottom-2 duration-300">
+                      <div className="w-full">
+                        <div className="flex items-center gap-2 mb-2 px-1">
+                          <div className={`w-7 h-7 rounded-lg ${agentTheme.iconBg} border border-white/10 flex items-center justify-center shadow-sm`}>
+                            <Bot size={16} className={agentTheme.iconText} />
+                          </div>
+                          <span className={`text-[11px] font-bold ${agentTheme.text} uppercase tracking-wider`}>
+                            {agent === 'Multi-Agent Hub' ? 'Agents are typing...' : agent}
+                          </span>
+                        </div>
+                        <div className="flex gap-1.5 py-3.5 px-4 bg-[var(--color-bg-tertiary)] border border-[var(--color-border-primary)] rounded-2xl rounded-tl-sm w-fit items-center shadow-sm">
+                          <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                          <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                          <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })()

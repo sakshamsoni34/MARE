@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { Node, Edge } from '@xyflow/react';
 
-export type Agent = 'Researcher Agent' | 'Coder Agent' | 'Planner Agent' | 'Executor Agent' | 'Reviewer Agent' | 'Designer Agent' | 'Tester Agent' | 'Task Decomposer Agent' | 'Goal Manager Agent' | 'Web Search Agent' | 'Academic Research Agent' | 'Browser Agent' | 'News Agent' | 'Code Agent' | 'Python Agent' | 'Automation Agent' | 'Data Analysis Agent' | 'Visualization Agent' | 'Validation Agent' | 'Report Generator Agent' | 'Presentation Agent' | 'Export Agent' | 'Live Workflow Agent' | 'Agent Communication Agent' | 'Logs Agent' | 'Events Agent' | 'Orqion';
+export type Agent = 'Multi-Agent Hub' | 'Researcher Agent' | 'Coder Agent' | 'Planner Agent' | 'Executor Agent' | 'Reviewer Agent' | 'Designer Agent' | 'Tester Agent' | 'Task Decomposer Agent' | 'Goal Manager Agent' | 'Web Search Agent' | 'Academic Research Agent' | 'Browser Agent' | 'News Agent' | 'Code Agent' | 'Python Agent' | 'Automation Agent' | 'Data Analysis Agent' | 'Visualization Agent' | 'Validation Agent' | 'Report Generator Agent' | 'Presentation Agent' | 'Export Agent' | 'Live Workflow Agent' | 'Agent Communication Agent' | 'Logs Agent' | 'Events Agent' | 'Orqion';
 
 export interface PastConversation {
   id: string;
@@ -44,6 +44,7 @@ interface StoreState {
   selectedFolderId: string | null;
   isSignInModalOpen: boolean;
   pastConversations: PastConversation[];
+  hubSelectedAgents: Agent[];
 
   // Actions
   setActiveProject: (project: string) => void;
@@ -80,6 +81,7 @@ interface StoreState {
   savePastConversation: (agent: Agent, content: string) => void;
   loadPastConversation: (agent: Agent, id: string) => void;
   deletePastConversation: (id: string) => void;
+  toggleHubSelectedAgent: (agent: Agent) => void;
 }
 
 const initialCode = ``;
@@ -113,6 +115,7 @@ export const useStore = create<StoreState>()(
       selectedFolderId: null,
       isSignInModalOpen: false,
       pastConversations: [],
+      hubSelectedAgents: ['Planner Agent', 'Reviewer Agent'],
 
       setActiveProject: (project) => set({ activeProject: project }),
       setSignInModalOpen: (isOpen) => set({ isSignInModalOpen: isOpen }),
@@ -461,6 +464,13 @@ export const useStore = create<StoreState>()(
       deletePastConversation: (id) => set((state) => ({
         pastConversations: state.pastConversations.filter(c => c.id !== id)
       })),
+      toggleHubSelectedAgent: (agent) => set((state) => {
+        if (state.hubSelectedAgents.includes(agent)) {
+          return { hubSelectedAgents: state.hubSelectedAgents.filter(a => a !== agent) };
+        } else {
+          return { hubSelectedAgents: [...state.hubSelectedAgents, agent] };
+        }
+      }),
     }),
     {
       name: 'mare-store',

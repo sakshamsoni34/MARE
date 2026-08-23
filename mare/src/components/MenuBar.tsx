@@ -4,7 +4,7 @@ import { useStore } from '@/store/useStore';
 import { PanelLeft, PanelBottom, PanelRight, LayoutTemplate, Search, Monitor, Settings, UserCircle, Bot } from 'lucide-react';
 import { useSession, signOut } from 'next-auth/react';
 
-type MenuState = 'File' | 'Edit' | 'Run' | 'Terminal' | 'Help' | 'Settings' | 'Profile' | null;
+type MenuState = 'File' | 'Edit' | 'View' | 'Terminal' | 'Help' | 'Settings' | 'Profile' | null;
 
 interface MenuBarProps {
   onNewFile: () => void;
@@ -86,6 +86,11 @@ export default function MenuBar({ onNewFile, onNewFolder, showProfile = false, s
   };
 
   const handleOpenFile = async () => {
+    if (status !== 'authenticated') {
+      alert("Please sign in to select or open a file.");
+      useStore.getState().setSignInModalOpen(true);
+      return;
+    }
     try {
       const [fileHandle] = await (window as any).showOpenFilePicker();
       const file = await fileHandle.getFile();
@@ -130,6 +135,11 @@ export default function MenuBar({ onNewFile, onNewFolder, showProfile = false, s
   };
 
   const handleOpenFolder = async () => {
+    if (status !== 'authenticated') {
+      alert("Please sign in to select or open a folder.");
+      useStore.getState().setSignInModalOpen(true);
+      return;
+    }
     try {
       const dirHandle = await (window as any).showDirectoryPicker({ mode: 'readwrite' });
 
@@ -183,94 +193,57 @@ export default function MenuBar({ onNewFile, onNewFolder, showProfile = false, s
     if (activeMenu === 'Edit') {
       return (
         <div className="absolute top-full left-12 mt-0 py-1 w-64 bg-[#252526] border border-[#3c3c3c] shadow-lg rounded-md z-50">
-          <MenuItem label="Undo" shortcut="Ctrl+Z" onClick={() => handleAction('Undo')} />
-          <MenuItem label="Redo" shortcut="Ctrl+Y" onClick={() => handleAction('Redo')} />
+          <MenuItem label="Undo" shortcut="Ctrl+Z" onClick={() => document.execCommand('undo')} />
+          <MenuItem label="Redo" shortcut="Ctrl+Y" onClick={() => document.execCommand('redo')} />
           <MenuItem divider />
-          <MenuItem label="Cut" shortcut="Ctrl+X" onClick={() => handleAction('Cut')} />
-          <MenuItem label="Copy" shortcut="Ctrl+C" onClick={() => handleAction('Copy')} />
-          <MenuItem label="Paste" shortcut="Ctrl+V" onClick={() => handleAction('Paste')} />
+          <MenuItem label="Cut" shortcut="Ctrl+X" onClick={() => document.execCommand('cut')} />
+          <MenuItem label="Copy" shortcut="Ctrl+C" onClick={() => document.execCommand('copy')} />
+          <MenuItem label="Paste" shortcut="Ctrl+V" onClick={async () => {
+            try {
+              const text = await navigator.clipboard.readText();
+              document.execCommand('insertText', false, text);
+            } catch (err) {
+              console.error('Failed to read clipboard', err);
+            }
+          }} />
           <MenuItem divider />
-          <MenuItem label="Find" shortcut="Ctrl+F" onClick={() => handleAction('Find')} />
-          <MenuItem label="Replace" shortcut="Ctrl+H" onClick={() => handleAction('Replace')} />
+          <MenuItem label="Select All" shortcut="Ctrl+A" onClick={() => document.execCommand('selectAll')} />
           <MenuItem divider />
-          <MenuItem label="Toggle Line Comment" shortcut="Ctrl+/" onClick={() => handleAction('Toggle Comment')} />
+          <MenuItem label="Clear Editor" onClick={() => useStore.getState().setEditorCode('')} />
         </div>
       );
     }
-    if (activeMenu === 'Run') {
+    if (activeMenu === 'View') {
       return (
         <div className="absolute top-full left-[110px] mt-0 py-1 w-72 bg-[#252526] border border-[#3c3c3c] shadow-lg rounded-md z-50">
-          <MenuItem label="Start Debugging" shortcut="F5" onClick={() => handleAction('Start Debugging')} />
-          <MenuItem label="Run Without Debugging" shortcut="Ctrl+F5" onClick={() => handleAction('Run Without Debugging')} />
-          <MenuItem label="Stop Debugging" shortcut="Shift+F5" onClick={() => handleAction('Stop Debugging')} />
-          <MenuItem label="Restart Debugging" shortcut="Ctrl+Shift+F5" onClick={() => handleAction('Restart Debugging')} />
+          <MenuItem label="Toggle Explorer Sidebar" onClick={toggleSidebar} />
+          <MenuItem label="Toggle Orqion Chat" onClick={toggleRightSidebar} />
+          <MenuItem label="Toggle Terminal Panel" shortcut="Ctrl+`" onClick={toggleTerminal} />
           <MenuItem divider />
-          <MenuItem label="Open Configurations" onClick={() => handleAction('Open Configurations')} />
-          <MenuItem label="Add Configuration..." onClick={() => handleAction('Add Configuration')} />
+          <MenuItem label="Toggle Workflow Visualizer" onClick={() => useStore.getState().toggleWorkflow()} />
           <MenuItem divider />
-          <MenuItem label="Step Over" shortcut="F10" onClick={() => handleAction('Step Over')} />
-          <MenuItem label="Step Into" shortcut="F11" onClick={() => handleAction('Step Into')} />
-          <MenuItem label="Step Out" shortcut="Shift+F11" onClick={() => handleAction('Step Out')} />
-          <MenuItem label="Continue" shortcut="F5" onClick={() => handleAction('Continue')} />
-          <MenuItem divider />
-          <MenuItem label="Toggle Breakpoint" shortcut="F9" onClick={() => handleAction('Toggle Breakpoint')} />
-          <MenuItem label="New Breakpoint" shortcut=">" onClick={() => handleAction('New Breakpoint')} />
-          <MenuItem divider />
-          <MenuItem label="Enable All Breakpoints" onClick={() => handleAction('Enable All Breakpoints')} />
-          <MenuItem label="Disable All Breakpoints" onClick={() => handleAction('Disable All Breakpoints')} />
-          <MenuItem label="Remove All Breakpoints" onClick={() => handleAction('Remove All Breakpoints')} />
-          <MenuItem divider />
-          <MenuItem label="Install Additional Debuggers..." onClick={() => handleAction('Install Additional Debuggers')} />
+          <MenuItem label="Collapse All Folders" onClick={() => useStore.getState().collapseAllFolders()} />
         </div>
       );
     }
     if (activeMenu === 'Terminal') {
       return (
-        <div className="absolute top-full left-[150px] mt-0 py-1 w-72 bg-[#252526] border border-[#3c3c3c] shadow-lg rounded-md z-50">
-          <MenuItem label="New Terminal" shortcut="Ctrl+Shift+`" onClick={() => handleAction('New Terminal')} />
-          <MenuItem label="Split Terminal" shortcut="Ctrl+Shift+5" onClick={() => handleAction('Split Terminal')} />
-          <MenuItem label="New Terminal Window" shortcut="Ctrl+Shift+Alt+`" onClick={() => handleAction('New Terminal Window')} />
+        <div className="absolute top-full left-[150px] mt-0 py-1 w-64 bg-[#252526] border border-[#3c3c3c] shadow-lg rounded-md z-50">
+          <MenuItem label="Toggle Terminal" shortcut="Ctrl+`" onClick={toggleTerminal} />
           <MenuItem divider />
-          <MenuItem label="Run Task..." onClick={() => handleAction('Run Task')} />
-          <MenuItem label="Run Build Task..." shortcut="Ctrl+Shift+B" onClick={() => handleAction('Run Build Task')} />
-          <MenuItem label="Run Active File" onClick={() => handleAction('Run Active File')} />
-          <MenuItem label="Run Selected Text" onClick={() => handleAction('Run Selected Text')} />
-          <MenuItem divider />
-          <MenuItem label="Show Running Tasks..." onClick={() => handleAction('Show Running Tasks')} />
-          <MenuItem label="Restart Running Task..." onClick={() => handleAction('Restart Running Task')} />
-          <MenuItem label="Terminate Task..." onClick={() => handleAction('Terminate Task')} />
-          <MenuItem divider />
-          <MenuItem label="Configure Tasks..." onClick={() => handleAction('Configure Tasks')} />
-          <MenuItem label="Configure Default Build Task..." onClick={() => handleAction('Configure Default Build Task')} />
+          <MenuItem label="Clear Terminal Logs" onClick={() => useStore.getState().clearTerminalLogs()} />
         </div>
       );
     }
     if (activeMenu === 'Help') {
       return (
         <div className="absolute top-full left-[220px] mt-0 py-1 w-64 bg-[#252526] border border-[#3c3c3c] shadow-lg rounded-md z-50">
-          <MenuItem label="Welcome" onClick={() => handleAction('Welcome')} />
-          <MenuItem label="Show All Commands" shortcut="Ctrl+Shift+P" onClick={() => handleAction('Show All Commands')} />
-          <MenuItem label="Documentation" onClick={() => handleAction('Documentation')} />
-          <MenuItem label="Editor Playground" onClick={() => handleAction('Editor Playground')} />
-          <MenuItem label="Show Release Notes" onClick={() => handleAction('Show Release Notes')} />
+          <MenuItem label="Welcome" onClick={() => alert('Welcome to MARE - Multi-Agent Research Environment')} />
+          <MenuItem label="Documentation" onClick={() => alert('Documentation coming soon!')} />
           <MenuItem divider />
-          <MenuItem label="Keyboard Shortcuts Reference" shortcut="Ctrl+K Ctrl+R" onClick={() => handleAction('Keyboard Shortcuts')} />
-          <MenuItem label="Video Tutorials" onClick={() => handleAction('Video Tutorials')} />
-          <MenuItem label="Tips and Tricks" onClick={() => handleAction('Tips and Tricks')} />
+          <MenuItem label="Keyboard Shortcuts Reference" onClick={() => alert('Ctrl+`: Toggle Terminal')} />
           <MenuItem divider />
-          <MenuItem label="Join Us on YouTube" onClick={() => handleAction('Join Us on YouTube')} />
-          <MenuItem label="Search Feature Requests" onClick={() => handleAction('Search Feature Requests')} />
-          <MenuItem label="Report Issue" onClick={() => handleAction('Report Issue')} />
-          <MenuItem divider />
-          <MenuItem label="View License" onClick={() => handleAction('View License')} />
-          <MenuItem label="Privacy Statement" onClick={() => handleAction('Privacy Statement')} />
-          <MenuItem divider />
-          <MenuItem label="Toggle Developer Tools" onClick={() => handleAction('Toggle Developer Tools')} />
-          <MenuItem label="Open Process Explorer" onClick={() => handleAction('Open Process Explorer')} />
-          <MenuItem divider />
-          <MenuItem label="Check for Updates..." onClick={() => handleAction('Check for Updates')} />
-          <MenuItem divider />
-          <MenuItem label="About" onClick={() => handleAction('About')} />
+          <MenuItem label="About MARE" onClick={() => alert('MARE v1.0.0')} />
         </div>
       );
     }
@@ -327,7 +300,7 @@ export default function MenuBar({ onNewFile, onNewFolder, showProfile = false, s
     return null;
   };
 
-  const navItems: MenuState[] = ['File', 'Edit', 'Run', 'Terminal', 'Help'];
+  const navItems: MenuState[] = ['File', 'Edit', 'View', 'Terminal', 'Help'];
 
   return (
     <div ref={menuRef} className="flex h-9 w-full shrink-0 items-center justify-between bg-[#181818] px-2 text-[13px] text-[#cccccc] relative font-sans border-b border-[#2b2b2b] select-none z-50">
@@ -359,6 +332,10 @@ export default function MenuBar({ onNewFile, onNewFolder, showProfile = false, s
           <div className="p-1 hover:bg-white/10 rounded cursor-pointer" onClick={toggleTerminal} title="Toggle Bottom Terminal"><PanelBottom size={14} /></div>
           <button
             onClick={async () => {
+              if (!useStore.getState().activeProject) {
+                alert("Please select a workspace folder first to start chatting.");
+                return;
+              }
               toggleRightSidebar();
               try {
                 await fetch('http://localhost:8555/api/oquiron', {

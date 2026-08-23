@@ -6,6 +6,7 @@ import { Folder, Copy, Activity, Cpu } from 'lucide-react';
 import MenuBar from '@/components/MenuBar';
 import Sidebar from '@/components/Sidebar';
 import dynamic from 'next/dynamic';
+import { useSession } from 'next-auth/react';
 
 const ParticleSphere = dynamic(() => import('@/components/ParticleSphere'), {
   ssr: false,
@@ -16,7 +17,8 @@ import { useStore } from '@/store/useStore';
 
 export default function RootPage() {
   const router = useRouter();
-  const { setActiveProject, runningAgents } = useStore();
+  const { setActiveProject, runningAgents, activeProject } = useStore();
+  const { status } = useSession();
 
   const isAnyAgentRunning = Object.values(runningAgents || {}).some(Boolean);
 
@@ -43,6 +45,20 @@ export default function RootPage() {
           <div className="flex flex-1 overflow-hidden bg-[var(--color-bg-primary)]">
             <main className="flex flex-1 flex-col items-center justify-center p-6 overflow-hidden relative bg-black">
               <ParticleSphere />
+              
+              {status === 'authenticated' && !activeProject ? (
+                <div className="absolute top-6 right-6 z-50 flex flex-col items-start gap-3 bg-black/60 p-5 rounded-xl backdrop-blur-md border border-[var(--color-border-primary)] shadow-xl max-w-sm">
+                  <div className="text-white text-sm font-medium">Select a workspace folder to start</div>
+                  <button 
+                    onClick={handleOpenFolder} 
+                    className="flex items-center gap-2 px-4 py-2.5 w-full justify-center bg-[#0078d4] hover:bg-[#006cbd] text-white text-sm rounded-lg font-medium transition-all shadow-[0_0_15px_rgba(0,120,212,0.3)] hover:shadow-[0_0_25px_rgba(0,120,212,0.5)] transform hover:-translate-y-0.5"
+                  >
+                    <Folder size={16} />
+                    Select Folder
+                  </button>
+                </div>
+              ) : null}
+
               {/* Logo */}
               <div className="flex flex-col items-center justify-center select-none relative w-full h-[480px]">
                 {/* Soft Radial Halo */}

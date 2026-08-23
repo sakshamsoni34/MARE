@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { Home, Bot, BrainCircuit, Search, Settings, BarChart2, FileText, Activity, Folder, Cog, Network } from 'lucide-react';
+import { Home, Bot, BrainCircuit, Search, Settings, BarChart2, FileText, Activity, Folder, Cog, Network, Users } from 'lucide-react';
 import { useStore, Agent } from '@/store/useStore';
 import Explorer from '@/components/Explorer';
 
-type ActivityTab = 'Explorer' | 'Planning' | 'Research' | 'Execution' | 'Analysis' | 'Reporting' | 'Monitoring' | 'Projects' | 'Settings';
+type ActivityTab = 'Explorer' | 'Hub' | 'Planning' | 'Research' | 'Execution' | 'Analysis' | 'Reporting' | 'Monitoring' | 'Projects' | 'Settings';
 
 export default function Sidebar() {
   const { activeAgent, setActiveAgent, addOpenAgent, toggleWorkflow, isWorkflowOpen, activeProject, isSidebarOpen, toggleSidebar, toggleRightSidebar, isRightSidebarOpen } = useStore();
@@ -78,6 +78,12 @@ export default function Sidebar() {
     switch(activeTab) {
       case 'Explorer':
         return <Explorer />;
+      case 'Hub':
+        return (
+          <div className="flex flex-col gap-0.5 p-2">
+            <AgentItem agent="Multi-Agent Hub" />
+          </div>
+        );
       case 'Planning':
         return (
           <div className="flex flex-col gap-0.5 p-2">
@@ -150,6 +156,7 @@ export default function Sidebar() {
       {/* Activity Bar (Icons only) */}
       <aside className="w-12 shrink-0 bg-[#1e1e1e] flex flex-col items-center py-2 h-full border-r border-[#2d2d2d] z-10">
         <ActivityIcon icon={<Home size={22} strokeWidth={1.5} />} label="Explorer" isActive={activeTab === 'Explorer'} onClick={() => handleTabClick('Explorer')} />
+        <ActivityIcon icon={<Users size={22} strokeWidth={1.5} />} label="Multi-Agent Hub" isActive={activeTab === 'Hub'} onClick={() => handleTabClick('Hub')} />
         <ActivityIcon icon={<BrainCircuit size={22} strokeWidth={1.5} />} label="Planning" isActive={activeTab === 'Planning'} onClick={() => handleTabClick('Planning')} />
         <ActivityIcon icon={<Search size={22} strokeWidth={1.5} />} label="Research" isActive={activeTab === 'Research'} onClick={() => handleTabClick('Research')} />
         <ActivityIcon icon={<Cog size={22} strokeWidth={1.5} />} label="Execution" isActive={activeTab === 'Execution'} onClick={() => handleTabClick('Execution')} />
