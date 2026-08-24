@@ -1,140 +1,114 @@
-import mysql.connector
+import sqlite3
+import os
 
-# Connect to MySQL server (without specifying DB first)
+# Connect to SQLite file
+db_path = os.path.join(os.path.dirname(__file__), 'mare.db')
+
 try:
-    conn = mysql.connector.connect(
-        host="localhost",
-        user="root",
-        password="Saksham@2006"
-    )
+    # This will create mare.db if it doesn't exist
+    conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
-    # Create Database
-    cursor.execute("CREATE DATABASE IF NOT EXISTS mare")
-    print("Database 'mare' created successfully or already exists.")
-    
-    # Use Database
-    cursor.execute("USE mare")
+    # Drop existing tables for a clean slate
+    print("Dropping existing tables if any...")
+    cursor.execute("DROP TABLE IF EXISTS users")
+    cursor.execute("DROP TABLE IF EXISTS projects")
+    cursor.execute("DROP TABLE IF EXISTS files")
+    cursor.execute("DROP TABLE IF EXISTS conversations")
+    cursor.execute("DROP TABLE IF EXISTS workflows")
+    cursor.execute("DROP TABLE IF EXISTS agents_state")
 
-    # Table queries without foreign keys
+    # Table queries
     tables = []
 
     tables.append("""
     CREATE TABLE IF NOT EXISTS users (
-      id BIGINT AUTO_INCREMENT PRIMARY KEY,
-      email VARCHAR(255) UNIQUE NOT NULL,
-      password_hash VARCHAR(255) NOT NULL,
-      first_name VARCHAR(100),
-      last_name VARCHAR(100),
-      is_active BOOLEAN DEFAULT TRUE,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-      INDEX idx_users_email (email)
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        email TEXT UNIQUE NOT NULL,
+        password_hash TEXT NOT NULL,
+        first_name TEXT,
+        last_name TEXT,
+        is_active INTEGER DEFAULT 1,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     """)
 
     tables.append("""
-    CREATE TABLE IF NOT EXISTS agents (
-      id BIGINT AUTO_INCREMENT PRIMARY KEY,
-      user_id BIGINT NOT NULL,
-      name VARCHAR(100) NOT NULL,
+    CREATE TABLE IF NOT EXISTS projects (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
       description TEXT,
-      system_prompt TEXT,
-      model_name VARCHAR(100),
-      is_active BOOLEAN DEFAULT TRUE,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-      INDEX idx_agents_user_id (user_id),
-      INDEX idx_agents_name (name)
+      goal TEXT,
+      source TEXT,
+      priority TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     """)
 
     tables.append("""
-    CREATE TABLE IF NOT EXISTS chat_sessions (
-      id BIGINT AUTO_INCREMENT PRIMARY KEY,
-      user_id BIGINT NOT NULL,
-      agent_id BIGINT NOT NULL,
-      title VARCHAR(255),
-      status ENUM('active', 'archived', 'deleted') DEFAULT 'active',
+    CREATE TABLE IF NOT EXISTS files (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      node_id TEXT NOT NULL,
+      parent_id TEXT,
+      name TEXT NOT NULL,
+      type TEXT CHECK(type IN ('file', 'folder')) NOT NULL,
+      content TEXT,
+      agent_name TEXT,
+      agent_contents TEXT,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-      INDEX idx_chat_sessions_user_id (user_id),
-      INDEX idx_chat_sessions_agent_id (agent_id),
-      INDEX idx_chat_sessions_status (status)
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     """)
 
+    tables.append("CREATE INDEX IF NOT EXISTS idx_files_node_id ON files (node_id)")
+
     tables.append("""
-    CREATE TABLE IF NOT EXISTS chat_messages (
-      id BIGINT AUTO_INCREMENT PRIMARY KEY,
-      session_id BIGINT NOT NULL,
-      sender_type ENUM('user', 'agent', 'system') NOT NULL,
+    CREATE TABLE IF NOT EXISTS conversations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      convo_id TEXT NOT NULL,
+      agent TEXT NOT NULL,
+      title TEXT,
       content TEXT NOT NULL,
-      tokens_used INT,
+      timestamp TEXT,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      INDEX idx_chat_messages_session_id (session_id),
-      INDEX idx_chat_messages_created_at (created_at)
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     """)
+    
+    tables.append("CREATE INDEX IF NOT EXISTS idx_conversations_convo_id ON conversations (convo_id)")
 
     tables.append("""
     CREATE TABLE IF NOT EXISTS workflows (
-      id BIGINT AUTO_INCREMENT PRIMARY KEY,
-      user_id BIGINT NOT NULL,
-      name VARCHAR(255) NOT NULL,
-      description TEXT,
-      file_name VARCHAR(255),
-      nodes_count INT DEFAULT 0,
-      edges_count INT DEFAULT 0,
-      configuration JSON,
-      is_active BOOLEAN DEFAULT TRUE,
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      project_name TEXT,
+      nodes TEXT,
+      edges TEXT,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-      INDEX idx_workflows_user_id (user_id)
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     """)
 
     tables.append("""
-    CREATE TABLE IF NOT EXISTS saved_files (
-      id BIGINT AUTO_INCREMENT PRIMARY KEY,
-      user_id BIGINT NOT NULL,
-      agent_id BIGINT,
-      workflow_id BIGINT,
-      folder_name VARCHAR(255) NOT NULL,
-      file_name VARCHAR(255) NOT NULL,
-      file_path VARCHAR(1024) NOT NULL,
-      file_size_bytes BIGINT,
-      mime_type VARCHAR(100),
+    CREATE TABLE IF NOT EXISTS agents_state (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      agent_name TEXT NOT NULL,
+      script_code TEXT,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-      INDEX idx_saved_files_user_id (user_id),
-      INDEX idx_saved_files_folder_name (folder_name),
-      INDEX idx_saved_files_folder_file (folder_name, file_name)
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     """)
 
-    tables.append("""
-    CREATE TABLE IF NOT EXISTS ui_events (
-      id BIGINT AUTO_INCREMENT PRIMARY KEY,
-      user_id BIGINT,
-      action VARCHAR(255) NOT NULL,
-      details JSON,
-      folder_name VARCHAR(255),
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      INDEX idx_ui_events_user_id (user_id),
-      INDEX idx_ui_events_action (action),
-      INDEX idx_ui_events_created_at (created_at)
-    )
-    """)
+    tables.append("CREATE INDEX IF NOT EXISTS idx_agents_state_name ON agents_state (agent_name)")
 
     for query in tables:
         cursor.execute(query)
 
-    print("Tables created successfully (without foreign keys).")
+    conn.commit()
+    print("Database 'mare.db' and tables created successfully matching the React workflow structure.")
 
-except mysql.connector.Error as err:
+except sqlite3.Error as err:
     print(f"Error: {err}")
 finally:
-    if 'conn' in locals() and conn.is_connected():
+    if 'conn' in locals():
         cursor.close()
         conn.close()

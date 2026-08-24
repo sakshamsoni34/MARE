@@ -135,7 +135,7 @@ export default function TerminalOutput() {
           <div className="text-text-secondary">
             {activeProject ? (
               <div className="flex items-center gap-2 text-green-400">
-                <span>✓</span> No problems detected in project '{activeProject}'.
+                <span>✓</span> No problems detected in project &apos;{activeProject}&apos;.
               </div>
             ) : (
               <div className="text-yellow-500">
@@ -176,7 +176,7 @@ export default function TerminalOutput() {
             {userQuery ? (
               <>
                 <div className="mb-2 text-white">Latest Query:</div>
-                <div className="bg-white/5 p-2 rounded border border-white/10 italic text-brand-400">"{userQuery}"</div>
+                <div className="bg-white/5 p-2 rounded border border-white/10 italic text-brand-400">&quot;{userQuery}&quot;</div>
               </>
             ) : (
               <div>No queries have been made yet in this session.</div>

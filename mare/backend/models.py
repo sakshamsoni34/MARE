@@ -1,5 +1,5 @@
-from pydantic import BaseModel, Field
-from typing import Optional
+from pydantic import BaseModel
+from typing import Optional, Any, Dict, List
 
 class AgentRequest(BaseModel):
     agentName: str
@@ -11,20 +11,28 @@ class UIEventRequest(BaseModel):
     details: Optional[str] = ""
     folderName: Optional[str] = "unknown"
 
-class LogChatRequest(BaseModel):
-    agentName: str = "unknown"
-    userQuery: str = ""
-    agentResponse: str = ""
-    userId: Optional[int] = None
+class SyncFileRequest(BaseModel):
+    node_id: str
+    parent_id: Optional[str] = None
+    name: str
+    type: str # 'file' or 'folder'
+    content: Optional[str] = None
+    agent_name: Optional[str] = None
+    agent_contents: Optional[Dict[str, str]] = None
 
-class SavedFilesRequest(BaseModel):
-    fileName: str = "unknown"
-    agentName: str = "unknown"
-    folderName: Optional[str] = "unknown"
-    userId: Optional[int] = None
+class SyncConversationRequest(BaseModel):
+    convo_id: str
+    agent: str
+    title: str
+    content: str
+    timestamp: str
 
-class WorkflowRequest(BaseModel):
-    fileName: str = "unknown"
-    nodesCount: int = 0
-    edgesCount: int = 0
-    userId: Optional[int] = None
+class SyncWorkflowRequest(BaseModel):
+    project_name: Optional[str] = None
+    nodes: List[Any]
+    edges: List[Any]
+
+class SyncAgentStateRequest(BaseModel):
+    agent_name: str
+    script_code: str
+

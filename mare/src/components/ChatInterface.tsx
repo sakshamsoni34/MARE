@@ -128,7 +128,26 @@ const formatMarkdown = (text: string, agentTheme: any) => {
       return <hr key={i} className="my-4 border-white/5" />;
     }
 
-    let formatted = line
+    if (line.includes('[[VIEW_WORKFLOW]]')) {
+      return (
+        <div key={i} className="my-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+          <button
+            onClick={() => useStore.getState().setWorkflowOpen(true)}
+            className={`group flex items-center gap-2.5 px-5 py-2.5 rounded-xl border ${agentTheme.border} ${agentTheme.bg} hover:bg-white/10 ${agentTheme.text} transition-all duration-300 shadow-sm hover:shadow-md hover:-translate-y-0.5 relative overflow-hidden`}
+          >
+            <div className={`absolute inset-0 bg-gradient-to-r ${agentTheme.glow} to-transparent opacity-0 group-hover:opacity-20 transition-opacity duration-300`}></div>
+            <div className={`p-1 rounded-md ${agentTheme.iconBg} relative z-10`}>
+              <Maximize2 size={14} className={agentTheme.text} />
+            </div>
+            <span className="font-medium text-[13px] relative z-10 tracking-wide text-gray-200 group-hover:text-white transition-colors">
+              View Generated Workflow
+            </span>
+          </button>
+        </div>
+      );
+    }
+
+    const formatted = line
       .replace(/\*\*(.*?)\*\*/g, `<strong class="${agentTheme.text} font-semibold tracking-wide">$1</strong>`)
       .replace(/\*(.*?)\*/g, `<em class="italic text-gray-400">$1</em>`)
       .replace(/`(.*?)`/g, `<code class="${agentTheme.bg} ${agentTheme.text} px-1.5 py-0.5 rounded text-[12px] font-mono border ${agentTheme.border} shadow-sm">$1</code>`)
@@ -256,6 +275,16 @@ IMPORTANT: If your response involves a process, plan, or multiple steps, always 
 `;
 
       let systemPromptToUse = agentScripts[agent] || 'You are a helpful AI assistant.';
+
+      systemPromptToUse += `\n\nIMPORTANT FORMATTING RULE: 
+You must structure your response into two parts:
+1. The direct answer (brief, professional, and straight to the point).
+2. Relevant details (code, explanations, background, extra context).
+You must separate them using this EXACT delimiter on its own line:
+===DETAILS===
+Everything before the delimiter is the direct answer. Everything after is the relevant details.
+If your response is just a direct answer and needs no extra details, omit the delimiter.
+If the user asks for code, put a very brief summary before the delimiter, and the entire code block after the delimiter.`;
       
       if (agent !== 'Orqion') {
         systemPromptToUse += autoWorkflowPrompt;
@@ -305,7 +334,7 @@ Supported types:
             updateAgentScript(agent, currentScriptCode);
             addTerminalLog(`> Status: <span class="text-accent-yellow">HUB: Executing ${subAgent}...</span>`);
 
-            let hubSystemPrompt = (AGENT_CONFIGS[subAgent]?.description || 'You are a helpful AI.') + autoWorkflowPrompt + `\n\n[CONTEXT FROM PREVIOUS AGENTS]\n${accumulatedContext}\nPlease build upon the previous responses to accomplish the user's request.`;
+            const hubSystemPrompt = (AGENT_CONFIGS[subAgent]?.description || 'You are a helpful AI.') + autoWorkflowPrompt + `\n\n[CONTEXT FROM PREVIOUS AGENTS]\n${accumulatedContext}\nPlease build upon the previous responses to accomplish the user's request.`;
             
             const response = await fetch('http://localhost:8555/api/agent', {
               method: 'POST',
@@ -325,6 +354,7 @@ Supported types:
             const reader = response.body?.getReader();
             const decoder = new TextDecoder();
             let subAgentOutput = "";
+            let lastUpdate = Date.now();
 
             while (reader) {
               const { value, done } = await reader.read();
@@ -342,13 +372,19 @@ Supported types:
                       if (content) {
                         currentScriptCode += content;
                         subAgentOutput += content;
-                        updateAgentScript(agent, currentScriptCode);
+                        
+                        const now = Date.now();
+                        if (now - lastUpdate > 50) {
+                          updateAgentScript(agent, currentScriptCode);
+                          lastUpdate = now;
+                        }
                       }
                     } catch (e) { }
                   }
                 }
               }
             }
+            updateAgentScript(agent, currentScriptCode);
             accumulatedContext += `\n\n--- [Output from ${subAgent}] ---\n${subAgentOutput}\n`;
          }
       } else {
@@ -381,6 +417,8 @@ Supported types:
       currentScriptCode += `\n\n**You:** ${queryToUse}\n`;
       currentScriptCode += `\n**${agent}:**\n\n`;
       updateAgentScript(agent, currentScriptCode);
+      
+      let lastUpdate = Date.now();
 
       while (reader) {
         const { value, done } = await reader.read();
@@ -398,7 +436,12 @@ Supported types:
                 const content = parsed.choices?.[0]?.delta?.content;
                 if (content) {
                   currentScriptCode += content;
-                  updateAgentScript(agent, currentScriptCode);
+                  
+                  const now = Date.now();
+                  if (now - lastUpdate > 50) {
+                    updateAgentScript(agent, currentScriptCode);
+                    lastUpdate = now;
+                  }
                 }
               } catch (e) {
                 // ignore
@@ -407,6 +450,7 @@ Supported types:
           }
         }
       }
+      updateAgentScript(agent, currentScriptCode);
 
       const jsonBlocks = [...currentScriptCode.matchAll(/```json\s*([\s\S]*?)\s*```/g)];
       for (const match of jsonBlocks) {
@@ -415,10 +459,10 @@ Supported types:
           if (parsed.workflow && parsed.workflow.nodes && parsed.workflow.edges) {
             useStore.getState().setWorkflowNodes(parsed.workflow.nodes);
             useStore.getState().setWorkflowEdges(parsed.workflow.edges);
-            useStore.getState().setWorkflowOpen(true);
+            // Note: We no longer auto-open the workflow; the user clicks the button instead.
             addTerminalLog(`> Status: <span class="text-accent-blue">Generated workflow from response.</span>`);
 
-            currentScriptCode = currentScriptCode.replace(match[0], '\n> *[Workflow configuration extracted and rendered in the Multi-Agent Workflow panel]*\n');
+            currentScriptCode = currentScriptCode.replace(match[0], '\n[[VIEW_WORKFLOW]]\n');
             updateAgentScript(agent, currentScriptCode);
             break;
           }
@@ -490,14 +534,15 @@ Supported types:
       // Log the conversation to the new API endpoint
       try {
         const fullAgentResponse = currentScriptCode.split(`**${agent}:**\n\n`)[1] || '';
-        const logResponse = await fetch('http://localhost:8555/api/log_chat', {
+        const logResponse = await fetch('http://localhost:8555/api/sync/conversation', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            agentName: agent,
-            userQuery: queryToUse,
-            agentResponse: fullAgentResponse.trim(),
-            userId: userId
+            convo_id: Date.now().toString(),
+            agent: agent,
+            title: queryToUse.substring(0, 50),
+            content: fullAgentResponse.trim(),
+            timestamp: new Date().toISOString()
           })
         });
         if (logResponse.ok) {
@@ -532,10 +577,18 @@ Supported types:
         setTimeout(() => setShowSavePopup(null), 3000);
 
         try {
-          const logResponse = await fetch('http://localhost:8555/api/saved_files', {
+          const logResponse = await fetch('http://localhost:8555/api/sync/file', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ fileName: selectedNode.name, agentName: agent, folderName: findParentFolder(fileSystem, selectedFolderId) || "root", userId: userId })
+            body: JSON.stringify({
+              node_id: selectedNode.id,
+              parent_id: findParentFolder(fileSystem, selectedFolderId),
+              name: selectedNode.name,
+              type: 'file',
+              content: code,
+              agent_name: agent,
+              agent_contents: { [agent]: code }
+            })
           });
           if (logResponse.ok) {
             const logJson = await logResponse.json();
@@ -570,11 +623,18 @@ Supported types:
       setTimeout(() => setShowSavePopup(null), 3000);
 
       try {
-        const folderName = selectedFolderId ? (findNode(fileSystem, selectedFolderId)?.type === 'folder' ? findNode(fileSystem, selectedFolderId)?.name : findParentFolder(fileSystem, selectedFolderId)) || "root" : "local";
-        const logResponse = await fetch('http://localhost:8555/api/saved_files', {
+        const logResponse = await fetch('http://localhost:8555/api/sync/file', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ fileName: handle.name, agentName: agent, folderName, userId: userId })
+          body: JSON.stringify({
+              node_id: Date.now().toString(),
+              parent_id: selectedFolderId,
+              name: handle.name,
+              type: 'file',
+              content: code,
+              agent_name: agent,
+              agent_contents: { [agent]: code }
+          })
         });
         if (logResponse.ok) {
           const logJson = await logResponse.json();
@@ -598,7 +658,7 @@ Supported types:
       className={`relative flex flex-1 flex-col rounded-xl border bg-[#1e1e1e] overflow-hidden shadow-lg mx-1 min-w-[300px] transition-all ${isActive ? 'border-brand-500/50 ring-1 ring-brand-500/20' : 'border-[var(--color-border-primary)] opacity-90'}`}
       onClick={() => setActiveAgent(agent)}
     >
-      <div className="flex items-center justify-between bg-transparent px-5 py-4 border-b border-white/5">
+      <div className="flex items-center justify-between bg-black/20 backdrop-blur-md px-5 py-4 border-b border-white/5 relative z-10 shadow-sm">
         <div className="flex items-center gap-2">
           <span className="font-medium text-[15px] text-blue-400">{agent === 'Orqion' ? 'Orqion' : agent}</span>
         </div>
@@ -678,10 +738,11 @@ Supported types:
                       onClick={() => {
                         setLocalQuery(prompt);
                       }}
-                      className="text-left px-4 py-3 rounded-xl border border-[var(--color-border-primary)] bg-[var(--color-bg-primary)] hover:border-brand-500/40 hover:bg-brand-500/5 transition-all text-[13px] text-gray-300 flex items-start gap-3 group"
+                      className="text-left px-5 py-3.5 rounded-xl border border-white/5 bg-white/5 hover:border-brand-500/30 hover:bg-brand-500/10 hover:-translate-y-0.5 transition-all duration-300 text-[13px] text-gray-300 flex items-start gap-3 group relative overflow-hidden shadow-sm hover:shadow-md"
                     >
-                      <MessageSquare size={14} className="mt-0.5 text-gray-500 group-hover:text-brand-400 transition-colors shrink-0" />
-                      <span className="leading-snug">{prompt}</span>
+                      <div className="absolute inset-0 bg-gradient-to-br from-brand-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                      <MessageSquare size={14} className="mt-0.5 text-gray-500 group-hover:text-brand-400 transition-colors shrink-0 relative z-10" />
+                      <span className="leading-snug relative z-10">{prompt}</span>
                     </button>
                   ))}
                 </div>
@@ -711,12 +772,52 @@ Supported types:
           ) : (
             (() => {
               const renderAgentResponse = (msgId: string, text: string, msgAgentTheme: any) => {
+                const parts = text.split('===DETAILS===');
+                const mainText = parts[0].trim();
+                const detailsText = parts.length > 1 ? parts.slice(1).join('===DETAILS===').trim() : '';
+                const isExpanded = expandedSection?.msgId === msgId;
+
                 return (
                   <div className={`relative mt-2 pl-4 py-2 before:absolute before:left-0 before:top-0 before:bottom-0 before:w-[2px] before:rounded-full before:bg-gradient-to-b ${msgAgentTheme.glow} before:to-transparent animate-in fade-in slide-in-from-left-2 duration-500`}>
                     <div className={`absolute -left-1.5 top-0 w-3 h-3 rounded-full ${msgAgentTheme.iconBg} border border-white/20 shadow-[0_0_10px_rgba(255,255,255,0.1)]`} style={{ boxShadow: `0 0 10px var(--tw-shadow-color)` }}></div>
                     <div className="text-[13.5px] text-gray-200 leading-[1.7] tracking-wide">
-                      {formatMarkdown(text, msgAgentTheme)}
+                      {formatMarkdown(mainText, msgAgentTheme)}
                     </div>
+                    {detailsText && (
+                      <div className="mt-4 max-w-full">
+                        <button 
+                          onClick={() => setExpandedSection(isExpanded ? null : { msgId, idx: 0 })}
+                          className={`group flex items-center justify-between w-full text-[12.5px] font-medium px-4 py-2.5 rounded-xl border ${msgAgentTheme.border} bg-white/5 hover:bg-white/10 transition-all duration-300 backdrop-blur-sm overflow-hidden relative shadow-sm hover:shadow-md`}
+                        >
+                          <div className="flex items-center gap-2.5 relative z-10">
+                            <div className={`p-1.5 rounded-md ${msgAgentTheme.bg} ${msgAgentTheme.text} shadow-sm group-hover:scale-110 transition-transform duration-300`}>
+                              <FileText size={14} />
+                            </div>
+                            <span className="text-gray-300 group-hover:text-white transition-colors tracking-wide">
+                              {isExpanded ? 'Hide Relevant Details' : 'View Relevant Details'}
+                            </span>
+                          </div>
+                          <div className={`relative z-10 transition-transform duration-500 ease-[cubic-bezier(0.87,_0,_0.13,_1)] ${isExpanded ? 'rotate-180' : ''}`}>
+                            <div className={`w-6 h-6 rounded-full ${msgAgentTheme.iconBg} flex items-center justify-center`}>
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={msgAgentTheme.text}><path d="m6 9 6 6 6-6"/></svg>
+                            </div>
+                          </div>
+                          {/* subtle gradient hover effect */}
+                          <div className={`absolute inset-0 bg-gradient-to-r ${msgAgentTheme.glow} to-transparent opacity-0 group-hover:opacity-[0.15] transition-opacity duration-500`}></div>
+                        </button>
+                        
+                        <div className={`grid transition-all duration-500 ease-[cubic-bezier(0.87,_0,_0.13,_1)] ${isExpanded ? 'grid-rows-[1fr] opacity-100 mt-2' : 'grid-rows-[0fr] opacity-0'}`}>
+                          <div className="overflow-hidden">
+                            <div className={`p-5 rounded-xl border ${msgAgentTheme.border} bg-black/40 backdrop-blur-xl shadow-inner relative mt-1`}>
+                              <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-white/20 to-transparent"></div>
+                              <div className="text-[13.5px] text-gray-300 leading-[1.7]">
+                                {formatMarkdown(detailsText, msgAgentTheme)}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               };
@@ -730,7 +831,7 @@ Supported types:
               while ((match = regex.exec(displayCode)) !== null) {
                 const senderName = match[1];
                 const isUser = senderName === 'You';
-                let text = match[2].trim();
+                const text = match[2].trim();
                 
                 messages.push({
                   id: `msg-${idCounter++}`,
@@ -751,8 +852,9 @@ Supported types:
                     return (
                     <div key={msg.id} className={`flex flex-col ${msg.sender === 'user' ? 'items-end' : 'items-start'}`}>
                       {msg.sender === 'user' ? (
-                        <div className="bg-[var(--color-bg-tertiary)] border border-[var(--color-border-primary)] text-gray-100 px-4 py-2.5 rounded-2xl rounded-tr-sm max-w-[85%] text-[13.5px] shadow-sm animate-in fade-in slide-in-from-right-2 duration-300">
-                          {msg.text}
+                        <div className="bg-gradient-to-br from-[var(--color-bg-tertiary)] to-[var(--color-bg-primary)] border border-white/5 text-gray-100 px-5 py-3 rounded-2xl rounded-tr-sm max-w-[85%] text-[13.5px] shadow-md shadow-black/20 animate-in fade-in slide-in-from-right-4 duration-500 hover:shadow-lg transition-all relative overflow-hidden group">
+                          <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                          <span className="relative z-10 leading-relaxed whitespace-pre-wrap">{msg.text}</span>
                         </div>
                       ) : (
                         <div className="w-full animate-in fade-in duration-300">
@@ -794,9 +896,12 @@ Supported types:
         </div>
 
         {/* Chat Input Area */}
-        <div className="p-4 bg-[var(--color-bg-primary)] border-t border-[var(--color-border-primary)] shrink-0 z-10 w-full relative">
-          <div className="max-w-4xl mx-auto flex flex-col gap-2">
-            <div className="flex items-end bg-[var(--color-bg-secondary)] rounded-xl w-full shadow-sm border border-[var(--color-border-primary)] focus-within:border-brand-500/50 focus-within:ring-1 focus-within:ring-brand-500/50 transition-all overflow-hidden">
+        <div className="p-4 bg-gradient-to-t from-[var(--color-bg-primary)] via-[var(--color-bg-primary)] to-transparent shrink-0 z-10 w-full relative pt-8">
+          <div className="max-w-4xl mx-auto flex flex-col gap-2 relative">
+            {/* Ambient glow behind input */}
+            <div className="absolute inset-0 bg-brand-500/10 blur-xl rounded-full opacity-40 -z-10"></div>
+            
+            <div className="flex items-end bg-black/40 backdrop-blur-xl rounded-2xl w-full shadow-2xl border border-white/10 focus-within:border-brand-500/40 focus-within:bg-black/60 transition-all duration-300 overflow-hidden group">
               <button className="text-gray-400 hover:text-gray-200 transition-colors flex-shrink-0 p-3 ml-1" title="Attach file">
                 <Plus size={18} strokeWidth={2} />
               </button>
@@ -813,7 +918,7 @@ Supported types:
                 placeholder={isRunning ? "Agent is typing..." : `Message ${agent}...`}
                 disabled={isRunning}
                 rows={1}
-                className="flex-1 bg-transparent text-[13.5px] text-gray-200 outline-none placeholder-gray-500 disabled:opacity-50 py-3 resize-none max-h-32 min-h-[44px] custom-scrollbar"
+                className="flex-1 bg-transparent text-[13.5px] text-gray-200 outline-none placeholder-gray-500 disabled:opacity-50 py-3.5 resize-none max-h-32 min-h-[50px] custom-scrollbar"
                 autoFocus
                 style={{ height: 'auto' }}
                 onInput={(e) => {
@@ -826,10 +931,10 @@ Supported types:
               <button
                 onClick={handleRunAgent}
                 disabled={isRunning || !localQuery.trim()}
-                className={`p-2 m-1.5 rounded-lg flex items-center justify-center transition-all flex-shrink-0 ${
+                className={`p-2.5 m-1.5 rounded-xl flex items-center justify-center transition-all duration-300 flex-shrink-0 ${
                   isRunning ? 'bg-brand-500/20 text-brand-500' : 
-                  !localQuery.trim() ? 'bg-[var(--color-bg-tertiary)] text-gray-500 cursor-not-allowed' :
-                  'bg-brand-500 hover:bg-brand-400 text-white shadow-sm'
+                  !localQuery.trim() ? 'bg-white/5 text-gray-500 cursor-not-allowed' :
+                  'bg-brand-500 hover:bg-brand-400 hover:shadow-lg hover:shadow-brand-500/25 hover:-translate-y-0.5 text-white shadow-sm'
                 }`}
                 title="Send message"
               >

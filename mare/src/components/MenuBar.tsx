@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useStore } from '@/store/useStore';
-import { PanelLeft, PanelBottom, PanelRight, LayoutTemplate, Search, Monitor, Settings, UserCircle, Bot } from 'lucide-react';
+import { PanelLeft, PanelBottom, PanelRight, Search, UserCircle, Bot } from 'lucide-react';
 import { useSession, signOut } from 'next-auth/react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 type MenuState = 'File' | 'Edit' | 'View' | 'Terminal' | 'Help' | 'Settings' | 'Profile' | null;
 
@@ -36,17 +37,17 @@ export default function MenuBar({ onNewFile, onNewFolder, showProfile = false, s
   };
 
   const MenuItem = ({ label, shortcut, divider, onClick }: { label?: string, shortcut?: string, divider?: boolean, onClick?: () => void }) => {
-    if (divider) return <div className="h-px bg-[#3c3c3c] my-1 mx-2" />;
+    if (divider) return <div className="h-px bg-white/10 my-1 mx-2" />;
     return (
       <div
-        className="flex items-center justify-between px-6 py-1.5 text-[13px] text-[#cccccc] hover:bg-[#0078d4] hover:text-white cursor-pointer group"
+        className="flex items-center justify-between px-6 py-2 text-[13px] text-text-secondary hover:bg-brand-500/20 hover:text-white cursor-pointer group transition-colors"
         onClick={() => {
           onClick?.();
           setActiveMenu(null);
         }}
       >
-        <span>{label}</span>
-        {shortcut && <span className="text-[#858585] group-hover:text-white ml-6 text-xs">{shortcut}</span>}
+        <span className="tracking-wide">{label}</span>
+        {shortcut && <span className="text-white/30 group-hover:text-white/70 ml-8 text-[11px] font-mono tracking-wider">{shortcut}</span>}
       </div>
     );
   };
@@ -54,40 +55,24 @@ export default function MenuBar({ onNewFile, onNewFolder, showProfile = false, s
   const { addTerminalLog, editorCode, toggleSidebar, toggleTerminal, toggleRightSidebar, isRightSidebarOpen } = useStore();
 
   const handleAction = async (actionName: string, folderName?: string) => {
-    addTerminalLog(`> <span class="text-text-secondary">Action triggered:</span> ${actionName}`);
-
+    addTerminalLog(`> <span class="text-brand-400">Action:</span> ${actionName}`);
     try {
       const response = await fetch('http://localhost:8555/api/event', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          action: actionName,
-          folderName: folderName
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: actionName, folderName: folderName }),
       });
-
-      if (!response.ok) {
-        throw new Error(`API error: ${response.status}`);
-      }
-
+      if (!response.ok) throw new Error(`API error: ${response.status}`);
       const jsonResponse = await response.json();
-      // Format the JSON nicely with indentation for the terminal
-      const formattedJson = JSON.stringify(jsonResponse, null, 2)
-        .replace(/\n/g, '<br>')
-        .replace(/ /g, '&nbsp;');
-
-      addTerminalLog(`> <span class="text-blue-400">API Response:</span> <br><pre class="text-xs text-gray-300 mt-1">${formattedJson}</pre>`);
-
+      const formattedJson = JSON.stringify(jsonResponse, null, 2).replace(/\n/g, '<br>').replace(/ /g, '&nbsp;');
+      addTerminalLog(`> <span class="text-blue-400">Response:</span> <br><pre class="text-xs text-white/60 mt-1">${formattedJson}</pre>`);
     } catch (error) {
-      addTerminalLog(`> <span class="text-red-400">Error calling API:</span> ${error}`);
+      addTerminalLog(`> <span class="text-red-400">Error:</span> ${error}`);
     }
   };
 
   const handleOpenFile = async () => {
     if (status !== 'authenticated') {
-      alert("Please sign in to select or open a file.");
       useStore.getState().setSignInModalOpen(true);
       return;
     }
@@ -96,62 +81,43 @@ export default function MenuBar({ onNewFile, onNewFolder, showProfile = false, s
       const file = await fileHandle.getFile();
       const contents = await file.text();
       useStore.getState().setEditorCode(contents);
-      addTerminalLog(`> <span class="text-accent-green">Success:</span> Opened file [${file.name}]`);
+      addTerminalLog(`> <span class="text-green-400">Success:</span> Opened file [${file.name}]`);
       await handleAction(`Opened file [${file.name}]`);
     } catch (err) {
-      addTerminalLog(`> <span class="text-accent-red">Error:</span> Failed to open file`);
+      addTerminalLog(`> <span class="text-red-400">Error:</span> Failed to open file`);
     }
   };
 
   const readDirectory = async (dirHandle: any, parentId: string = ''): Promise<any[]> => {
     const nodes = [];
     for await (const entry of dirHandle.values()) {
-      // Skip heavy/hidden folders to avoid hanging
-      if (entry.name === 'node_modules' || entry.name === '.git' || entry.name === '.next') continue;
-
+      if (['node_modules', '.git', '.next'].includes(entry.name)) continue;
       const id = parentId ? `${parentId}/${entry.name}` : entry.name;
-
       if (entry.kind === 'directory') {
-        nodes.push({
-          id,
-          name: entry.name,
-          type: 'folder',
-          isOpen: false,
-          children: await readDirectory(entry, id)
-        });
+        nodes.push({ id, name: entry.name, type: 'folder', isOpen: false, children: await readDirectory(entry, id) });
       } else {
-        nodes.push({
-          id,
-          name: entry.name,
-          type: 'file'
-        });
+        nodes.push({ id, name: entry.name, type: 'file' });
       }
     }
-    // Sort: folders first, then files, alphabetically
-    return nodes.sort((a, b) => {
-      if (a.type !== b.type) return a.type === 'folder' ? -1 : 1;
-      return a.name.localeCompare(b.name);
-    });
+    return nodes.sort((a, b) => a.type !== b.type ? (a.type === 'folder' ? -1 : 1) : a.name.localeCompare(b.name));
   };
 
   const handleOpenFolder = async () => {
     if (status !== 'authenticated') {
-      alert("Please sign in to select or open a folder.");
       useStore.getState().setSignInModalOpen(true);
       return;
     }
     try {
       const dirHandle = await (window as any).showDirectoryPicker({ mode: 'readwrite' });
-
       const children = await readDirectory(dirHandle);
       useStore.getState().setFileSystem(children);
       useStore.getState().setActiveProject(dirHandle.name);
-      addTerminalLog(`> <span class="text-accent-green">Success:</span> Loaded folder [${dirHandle.name}] and its contents.`);
+      addTerminalLog(`> <span class="text-green-400">Success:</span> Loaded workspace [${dirHandle.name}]`);
       await handleAction("Open Folder", dirHandle.name);
       router.push('/dashboard');
     } catch (err: unknown) {
       if (err instanceof Error && err.name === 'AbortError') return;
-      addTerminalLog(`> <span class="text-accent-red">Error:</span> Failed to open folder: ${err instanceof Error ? err.message : String(err)}`);
+      addTerminalLog(`> <span class="text-red-400">Error:</span> Failed to open folder`);
     }
   };
 
@@ -162,37 +128,55 @@ export default function MenuBar({ onNewFile, onNewFolder, showProfile = false, s
       await writable.write(useStore.getState().editorCode);
       await writable.close();
       useStore.getState().createFile(useStore.getState().selectedFolderId || null, fileHandle.name, useStore.getState().editorCode);
-      addTerminalLog(`> <span class="text-accent-green">Success:</span> File saved`);
+      addTerminalLog(`> <span class="text-green-400">Success:</span> File saved`);
       await handleAction(`Saved file`);
     } catch (err) {
-      addTerminalLog(`> <span class="text-accent-red">Error:</span> Failed to save file`);
+      addTerminalLog(`> <span class="text-red-400">Error:</span> Failed to save file`);
     }
   };
 
+  const dropdownVariants = {
+    hidden: { opacity: 0, y: -5, scale: 0.95 },
+    visible: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.15, ease: "easeOut" } },
+    exit: { opacity: 0, y: -5, scale: 0.95, transition: { duration: 0.1, ease: "easeIn" } }
+  };
+
   const renderDropdown = () => {
+    if (!activeMenu) return null;
+
+    const DropdownWrapper = ({ children, left, right }: any) => (
+      <motion.div
+        variants={dropdownVariants}
+        initial="hidden"
+        animate="visible"
+        exit="exit"
+        className={`absolute top-full mt-1 py-1.5 bg-[#141414]/95 backdrop-blur-xl border border-white/10 shadow-2xl rounded-xl z-50 overflow-hidden ${left !== undefined ? `left-[${left}px]` : ''} ${right !== undefined ? `right-${right}` : ''}`}
+        style={left !== undefined ? { left } : { right }}
+      >
+        {children}
+      </motion.div>
+    );
+
     if (activeMenu === 'File') {
       return (
-        <div className="absolute top-full left-0 mt-0 py-1 w-64 bg-[#252526] border border-[#3c3c3c] shadow-lg rounded-md z-50">
+        <DropdownWrapper left={0}><div className="w-64">
           <MenuItem label="New Text File" shortcut="Ctrl+N" onClick={handleSaveFile} />
           <MenuItem label="New File..." shortcut="Ctrl+Alt+Windows+N" onClick={handleSaveFile} />
           <MenuItem label="New Folder..." shortcut="Ctrl+Shift+N" onClick={handleOpenFolder} />
           <MenuItem divider />
           <MenuItem label="Open File..." shortcut="Ctrl+O" onClick={handleOpenFile} />
           <MenuItem label="Open Folder..." shortcut="Ctrl+K Ctrl+O" onClick={handleOpenFolder} />
-          <MenuItem label="Open Workspace from File..." onClick={handleOpenFile} />
-          <MenuItem label="Open Recent" onClick={() => handleAction('Open Recent')} />
           <MenuItem divider />
           <MenuItem label="Save" shortcut="Ctrl+S" onClick={handleSaveFile} />
           <MenuItem label="Save As..." shortcut="Ctrl+Shift+S" onClick={handleSaveFile} />
-          <MenuItem label="Save All" shortcut="Ctrl+K S" onClick={handleSaveFile} />
           <MenuItem divider />
           <MenuItem label="Exit" onClick={() => router.push('/')} />
-        </div>
+        </div></DropdownWrapper>
       );
     }
     if (activeMenu === 'Edit') {
       return (
-        <div className="absolute top-full left-12 mt-0 py-1 w-64 bg-[#252526] border border-[#3c3c3c] shadow-lg rounded-md z-50">
+        <DropdownWrapper left={60}><div className="w-64">
           <MenuItem label="Undo" shortcut="Ctrl+Z" onClick={() => document.execCommand('undo')} />
           <MenuItem label="Redo" shortcut="Ctrl+Y" onClick={() => document.execCommand('redo')} />
           <MenuItem divider />
@@ -202,99 +186,43 @@ export default function MenuBar({ onNewFile, onNewFolder, showProfile = false, s
             try {
               const text = await navigator.clipboard.readText();
               document.execCommand('insertText', false, text);
-            } catch (err) {
-              console.error('Failed to read clipboard', err);
-            }
+            } catch (err) { console.error(err); }
           }} />
           <MenuItem divider />
-          <MenuItem label="Select All" shortcut="Ctrl+A" onClick={() => document.execCommand('selectAll')} />
-          <MenuItem divider />
           <MenuItem label="Clear Editor" onClick={() => useStore.getState().setEditorCode('')} />
-        </div>
+        </div></DropdownWrapper>
       );
     }
     if (activeMenu === 'View') {
       return (
-        <div className="absolute top-full left-[110px] mt-0 py-1 w-72 bg-[#252526] border border-[#3c3c3c] shadow-lg rounded-md z-50">
+        <DropdownWrapper left={120}><div className="w-72">
           <MenuItem label="Toggle Explorer Sidebar" onClick={toggleSidebar} />
           <MenuItem label="Toggle Orqion Chat" onClick={toggleRightSidebar} />
           <MenuItem label="Toggle Terminal Panel" shortcut="Ctrl+`" onClick={toggleTerminal} />
           <MenuItem divider />
           <MenuItem label="Toggle Workflow Visualizer" onClick={() => useStore.getState().toggleWorkflow()} />
-          <MenuItem divider />
-          <MenuItem label="Collapse All Folders" onClick={() => useStore.getState().collapseAllFolders()} />
-        </div>
-      );
-    }
-    if (activeMenu === 'Terminal') {
-      return (
-        <div className="absolute top-full left-[150px] mt-0 py-1 w-64 bg-[#252526] border border-[#3c3c3c] shadow-lg rounded-md z-50">
-          <MenuItem label="Toggle Terminal" shortcut="Ctrl+`" onClick={toggleTerminal} />
-          <MenuItem divider />
-          <MenuItem label="Clear Terminal Logs" onClick={() => useStore.getState().clearTerminalLogs()} />
-        </div>
-      );
-    }
-    if (activeMenu === 'Help') {
-      return (
-        <div className="absolute top-full left-[220px] mt-0 py-1 w-64 bg-[#252526] border border-[#3c3c3c] shadow-lg rounded-md z-50">
-          <MenuItem label="Welcome" onClick={() => alert('Welcome to MARE - Multi-Agent Research Environment')} />
-          <MenuItem label="Documentation" onClick={() => alert('Documentation coming soon!')} />
-          <MenuItem divider />
-          <MenuItem label="Keyboard Shortcuts Reference" onClick={() => alert('Ctrl+`: Toggle Terminal')} />
-          <MenuItem divider />
-          <MenuItem label="About MARE" onClick={() => alert('MARE v1.0.0')} />
-        </div>
-      );
-    }
-    if (activeMenu === 'Settings') {
-      return (
-        <div className="absolute top-full right-8 mt-0 py-1 w-56 bg-[#252526] border border-[#3c3c3c] shadow-lg rounded-md z-50">
-          <MenuItem label="Command Palette..." shortcut="Ctrl+Shift+P" onClick={() => handleAction('Command Palette')} />
-          <MenuItem divider />
-          <MenuItem label="Settings" shortcut="Ctrl+," onClick={() => handleAction('Settings')} />
-          <MenuItem label="Extensions" shortcut="Ctrl+Shift+X" onClick={() => handleAction('Extensions')} />
-          <MenuItem label="Keyboard Shortcuts" shortcut="Ctrl+K Ctrl+S" onClick={() => handleAction('Keyboard Shortcuts')} />
-          <MenuItem divider />
-          <MenuItem label="User Snippets" onClick={() => handleAction('User Snippets')} />
-          <MenuItem label="Color Theme" shortcut="Ctrl+K Ctrl+T" onClick={() => handleAction('Color Theme')} />
-          <MenuItem label="File Icon Theme" onClick={() => handleAction('File Icon Theme')} />
-          <MenuItem divider />
-          <MenuItem label="Check for Updates..." onClick={() => handleAction('Check for Updates')} />
-        </div>
+        </div></DropdownWrapper>
       );
     }
     if (activeMenu === 'Profile') {
-      if (status === 'authenticated') {
-        return (
-          <div className="absolute top-full right-1 mt-0 py-2 w-64 bg-[#252526] border border-[#3c3c3c] shadow-lg rounded-md z-50">
-            <div className="px-6 py-2 mb-1 flex flex-col gap-1">
-              <div className="text-white font-medium text-sm">{session.user?.name}</div>
-              <div className="text-[#858585] text-xs truncate">{session.user?.email}</div>
-            </div>
-            <MenuItem divider />
-            <div className="px-6 py-2">
-              <div className="text-[#858585] text-[10px] uppercase tracking-wider mb-1 font-semibold">Current Project</div>
-              <div className="text-[#cccccc] text-sm truncate">{useStore.getState().activeProject || 'No Active Project'}</div>
-            </div>
-            <MenuItem divider />
-            <MenuItem label="Sign Out" onClick={() => {
-              useStore.getState().setActiveProject('');
-              signOut({ callbackUrl: '/' });
-            }} />
-          </div>
-        );
-      }
-
       return (
-        <div className="absolute top-full right-1 mt-0 py-1 w-56 bg-[#252526] border border-[#3c3c3c] shadow-lg rounded-md z-50">
-          <MenuItem label="Sign In to Sync Settings..." onClick={() => handleAction('Sign In')} />
-          <MenuItem divider />
-          <MenuItem label="Account Settings" onClick={() => handleAction('Account Settings')} />
-          <MenuItem label="Manage Trusted Extensions" onClick={() => handleAction('Manage Trusted Extensions')} />
-          <MenuItem divider />
-          <MenuItem label="Sign Out" onClick={() => handleAction('Sign Out')} />
-        </div>
+        <DropdownWrapper right={4}><div className="w-64">
+          {status === 'authenticated' ? (
+            <>
+              <div className="px-6 py-3 flex flex-col gap-0.5 bg-white/5">
+                <div className="text-white font-medium text-sm">{session.user?.name}</div>
+                <div className="text-text-secondary text-xs truncate">{session.user?.email}</div>
+              </div>
+              <MenuItem divider />
+              <MenuItem label="Sign Out" onClick={() => {
+                useStore.getState().setActiveProject('');
+                signOut({ callbackUrl: '/' });
+              }} />
+            </>
+          ) : (
+            <MenuItem label="Sign In" onClick={() => handleAction('Sign In')} />
+          )}
+        </div></DropdownWrapper>
       );
     }
     return null;
@@ -303,37 +231,41 @@ export default function MenuBar({ onNewFile, onNewFolder, showProfile = false, s
   const navItems: MenuState[] = ['File', 'Edit', 'View', 'Terminal', 'Help'];
 
   return (
-    <div ref={menuRef} className="flex h-9 w-full shrink-0 items-center justify-between bg-[#181818] px-2 text-[13px] text-[#cccccc] relative font-sans border-b border-[#2b2b2b] select-none z-50">
+    <div ref={menuRef} className="flex h-11 w-full shrink-0 items-center justify-between bg-[#0a0a0a]/80 backdrop-blur-md px-3 text-[13px] text-text-secondary relative font-sans border-b border-white/5 select-none z-[100]">
       <div className="flex items-center h-full flex-1">
-        {/* Logo placeholder */}
-        <div className="flex items-center justify-center w-10 h-full mr-1 cursor-default">
-          <img src="/logo.png" alt="Logo" className="w-8 h-8 object-contain mix-blend-screen" />
+        <div className="flex items-center justify-center w-10 h-full mr-2 cursor-default">
+          <img src="/logo.png" alt="Logo" className="w-8 h-8 object-contain mix-blend-screen brightness-125" />
         </div>
-        {navItems.map((item) => (
-          <div
-            key={item}
-            className={`px-2 py-1 cursor-pointer rounded-md mx-0.5 flex items-center ${activeMenu === item ? 'bg-[#3c3c3c] text-white' : 'hover:bg-white/10 hover:text-white'}`}
-            onClick={() => setActiveMenu(activeMenu === item ? null : item)}
-            onMouseEnter={() => handleHover(item)}
-          >
-            {item}
-          </div>
-        ))}
-        {renderDropdown()}
+        <div className="flex gap-1 h-full items-center relative">
+          {navItems.map((item) => (
+            <div
+              key={item}
+              className={`px-3 py-1.5 cursor-pointer rounded-lg flex items-center transition-colors ${activeMenu === item ? 'bg-white/10 text-white' : 'hover:bg-white/5 hover:text-white'}`}
+              onClick={() => setActiveMenu(activeMenu === item ? null : item)}
+              onMouseEnter={() => handleHover(item)}
+            >
+              {item}
+            </div>
+          ))}
+          <AnimatePresence>
+            {renderDropdown()}
+          </AnimatePresence>
+        </div>
       </div>
 
-      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-xs font-medium text-[#cccccc]">
-        MARE
+      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-xs font-semibold tracking-[0.2em] text-white/40 uppercase">
+        MARE Workspace
       </div>
 
-      <div className="flex items-center justify-end h-full flex-1 gap-2">
-        <div className="flex items-center gap-1 mr-2 text-[#cccccc]">
-          <div className="p-1 hover:bg-white/10 rounded cursor-pointer" onClick={toggleSidebar} title="Toggle Left Sidebar"><PanelLeft size={14} /></div>
-          <div className="p-1 hover:bg-white/10 rounded cursor-pointer" onClick={toggleTerminal} title="Toggle Bottom Terminal"><PanelBottom size={14} /></div>
+      <div className="flex items-center justify-end h-full flex-1 gap-2.5 pr-2">
+        <div className="flex items-center gap-1 text-text-secondary">
+          <button className="p-1.5 hover:bg-white/10 hover:text-white transition-colors rounded-lg" onClick={toggleSidebar} title="Toggle Sidebar"><PanelLeft size={16} strokeWidth={1.5} /></button>
+          <button className="p-1.5 hover:bg-white/10 hover:text-white transition-colors rounded-lg" onClick={toggleTerminal} title="Toggle Terminal"><PanelBottom size={16} strokeWidth={1.5} /></button>
+          
           <button
             onClick={async () => {
               if (!useStore.getState().activeProject) {
-                alert("Please select a workspace folder first to start chatting.");
+                alert("Please select a workspace folder first.");
                 return;
               }
               toggleRightSidebar();
@@ -341,46 +273,38 @@ export default function MenuBar({ onNewFile, onNewFolder, showProfile = false, s
                 await fetch('http://localhost:8555/api/oquiron', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    agentName: 'Orqion',
-                    userQuery: 'Clicked Orqion Chatbot',
-                    agentResponse: 'Opened'
-                  })
+                  body: JSON.stringify({ agentName: 'Orqion', userQuery: 'Clicked Orqion', agentResponse: 'Opened' })
                 });
-              } catch (error) {
-                console.error('Failed to call oquiron API', error);
-              }
+              } catch (error) { console.error(error); }
             }}
-            className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-medium transition-all ${
+            className={`flex items-center gap-2 px-3 py-1.5 ml-2 rounded-lg text-xs font-medium transition-all ${
               isRightSidebarOpen 
-                ? 'bg-brand-500/20 text-brand-400 border border-brand-500/30' 
-                : 'text-[#cccccc] hover:bg-white/10 hover:text-white'
+                ? 'bg-brand-500/20 text-brand-300 border border-brand-500/30 shadow-[inset_0_0_15px_rgba(139,92,246,0.1)]' 
+                : 'bg-white/5 hover:bg-white/10 hover:text-white border border-transparent'
             }`}
-            title="Toggle Orqion AI Assistant"
           >
-            <Bot size={13} className={isRightSidebarOpen ? 'text-brand-400' : 'text-[#cccccc]'} />
-            <span>Orqion</span>
+            <Bot size={15} strokeWidth={1.5} className={isRightSidebarOpen ? 'text-brand-400' : 'text-text-secondary'} />
+            <span className="tracking-wide">Orqion</span>
           </button>
-          <div className="p-1 hover:bg-white/10 rounded cursor-pointer ml-1"><Search size={14} /></div>
+          
           {showSignIn && status !== 'authenticated' && (
             <button
-              onClick={() => {
-                useStore.getState().setSignInModalOpen(true);
-              }}
-              className="ml-2 px-3 py-1 bg-brand-500 hover:bg-brand-400 text-white text-xs font-medium rounded shadow-sm transition-colors"
+              onClick={() => useStore.getState().setSignInModalOpen(true)}
+              className="ml-4 px-4 py-1.5 bg-brand-600 hover:bg-brand-500 text-white text-[13px] font-medium tracking-wide rounded-lg shadow-[0_0_15px_rgba(124,58,237,0.3)] transition-all"
             >
               Sign In
             </button>
           )}
+          
           {(showProfile || status === 'authenticated') && (
             <div
-              className={`p-1 rounded cursor-pointer ml-1 flex items-center justify-center ${activeMenu === 'Profile' ? 'bg-[#3c3c3c] text-white' : 'hover:bg-white/10'}`}
+              className={`p-1 ml-3 rounded-full cursor-pointer flex items-center justify-center border transition-all ${activeMenu === 'Profile' ? 'border-brand-400 bg-white/10' : 'border-transparent hover:border-white/20'}`}
               onClick={() => setActiveMenu(activeMenu === 'Profile' ? null : 'Profile')}
             >
               {session?.user?.image ? (
-                <img src={session.user.image} alt="Profile" className="w-4 h-4 rounded-full" referrerPolicy="no-referrer" />
+                <img src={session.user.image} alt="Profile" className="w-6 h-6 rounded-full" referrerPolicy="no-referrer" />
               ) : (
-                <UserCircle size={14} />
+                <UserCircle size={20} strokeWidth={1.5} />
               )}
             </div>
           )}

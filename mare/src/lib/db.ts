@@ -1,13 +1,22 @@
-import mysql from 'mysql2/promise';
+import { open } from 'sqlite';
+import path from 'path';
 
-const pool = mysql.createPool({
-  host: 'localhost',
-  user: 'root',
-  password: 'Saksham@2006',
-  database: 'mare',
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0
-});
+let dbInstance: any = null;
 
-export default pool;
+export async function getDb() {
+  if (dbInstance) return dbInstance;
+  
+  // Lazy import sqlite3 to prevent crash on route initialization
+  const sqlite3 = require('sqlite3');
+  
+  // Connect to the shared mare.db file inside the backend directory
+  const dbPath = path.join(process.cwd(), 'backend/mare.db');
+  
+  dbInstance = await open({
+    filename: dbPath,
+    driver: sqlite3.Database
+  });
+  
+  return dbInstance;
+}
+

@@ -79,13 +79,13 @@ export default function WorkflowVisualizer() {
       addTerminalLog(`> <span class="text-accent-green">Success:</span> Saved workflow to local file system.`);
 
       try {
-        const logResponse = await fetch('http://localhost:8555/api/workflow', {
+        const logResponse = await fetch('http://localhost:8555/api/sync/workflow', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
-            fileName: handle.name, 
-            nodesCount: workflowNodes.length,
-            edgesCount: workflowEdges.length
+            project_name: "default", 
+            nodes: workflowNodes,
+            edges: workflowEdges
           })
         });
         if (logResponse.ok) {

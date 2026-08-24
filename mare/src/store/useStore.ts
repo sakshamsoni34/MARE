@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+
 import { Node, Edge } from '@xyflow/react';
 
 export type Agent = 'Multi-Agent Hub' | 'Researcher Agent' | 'Coder Agent' | 'Planner Agent' | 'Executor Agent' | 'Reviewer Agent' | 'Designer Agent' | 'Tester Agent' | 'Task Decomposer Agent' | 'Goal Manager Agent' | 'Web Search Agent' | 'Academic Research Agent' | 'Browser Agent' | 'News Agent' | 'Code Agent' | 'Python Agent' | 'Automation Agent' | 'Data Analysis Agent' | 'Visualization Agent' | 'Validation Agent' | 'Report Generator Agent' | 'Presentation Agent' | 'Export Agent' | 'Live Workflow Agent' | 'Agent Communication Agent' | 'Logs Agent' | 'Events Agent' | 'Orqion';
@@ -82,6 +82,7 @@ interface StoreState {
   loadPastConversation: (agent: Agent, id: string) => void;
   deletePastConversation: (id: string) => void;
   toggleHubSelectedAgent: (agent: Agent) => void;
+  hydrateState: (payload: Partial<StoreState>) => void;
 }
 
 const initialCode = ``;
@@ -91,7 +92,6 @@ const initialEdges: Edge[] = [];
 const initialFileSystem: FileSystemNode[] = [];
 
 export const useStore = create<StoreState>()(
-  persist(
     (set) => ({
       projects: [],
       activeProject: '',
@@ -318,7 +318,7 @@ export const useStore = create<StoreState>()(
 
         const newFileSystem = deleteFromNodes(state.fileSystem);
 
-        let newAgentScripts = { ...state.agentScripts };
+        const newAgentScripts = { ...state.agentScripts };
         deletedAgents.forEach(agent => {
           newAgentScripts[agent] = '';
         });
@@ -471,17 +471,10 @@ export const useStore = create<StoreState>()(
           return { hubSelectedAgents: [...state.hubSelectedAgents, agent] };
         }
       }),
-    }),
-    {
-      name: 'mare-store',
-      partialize: (state) => ({
-        openAgents: state.openAgents,
-        activeProject: state.activeProject,
-        projects: state.projects,
-        agentScripts: state.agentScripts,
-        activeAgent: state.activeAgent,
-        pastConversations: state.pastConversations
-      })
-    }
-  )
+      hydrateState: (payload) => set((state) => ({
+        ...state,
+        ...payload,
+        terminalLogs: [...state.terminalLogs, '> <span class="text-accent-green">System state hydrated from database successfully.</span>']
+      })),
+    })
 );

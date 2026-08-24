@@ -68,6 +68,8 @@ export default function CodeEditor({ agent }: CodeEditorProps) {
       let currentScriptCode = agentScripts[agent] || '';
       currentScriptCode += `\n\n# --- ${agent} Response ---\n\n`;
       updateAgentScript(agent, currentScriptCode);
+      
+      let lastUpdate = Date.now();
 
       while (reader) {
         const { value, done } = await reader.read();
@@ -85,7 +87,12 @@ export default function CodeEditor({ agent }: CodeEditorProps) {
                 const content = parsed.choices?.[0]?.delta?.content;
                 if (content) {
                   currentScriptCode += content;
-                  updateAgentScript(agent, currentScriptCode);
+                  
+                  const now = Date.now();
+                  if (now - lastUpdate > 50) {
+                    updateAgentScript(agent, currentScriptCode);
+                    lastUpdate = now;
+                  }
                 }
               } catch (e) {
                 // ignore
@@ -94,6 +101,7 @@ export default function CodeEditor({ agent }: CodeEditorProps) {
           }
         }
       }
+      updateAgentScript(agent, currentScriptCode);
 
       const jsonBlocks = [...currentScriptCode.matchAll(/```json\s*([\s\S]*?)\s*```/g)];
       for (const match of jsonBlocks) {

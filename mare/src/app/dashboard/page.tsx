@@ -90,6 +90,8 @@ export default function Dashboard() {
         let currentScriptCode = useStore.getState().agentScripts[agentToRun] || '';
         currentScriptCode += `\n\n# --- ${agentToRun} Response ---\n\n`;
         useStore.getState().updateAgentScript(agentToRun, currentScriptCode);
+        
+        let lastUpdate = Date.now();
 
         while (reader) {
           const { value, done } = await reader.read();
@@ -107,7 +109,11 @@ export default function Dashboard() {
                   const content = parsed.choices?.[0]?.delta?.content;
                   if (content) {
                     currentScriptCode += content;
-                    useStore.getState().updateAgentScript(agentToRun, currentScriptCode);
+                    const now = Date.now();
+                    if (now - lastUpdate > 50) {
+                      useStore.getState().updateAgentScript(agentToRun, currentScriptCode);
+                      lastUpdate = now;
+                    }
                   }
                 } catch (e) {
                   // ignore parse errors for partial lines
@@ -116,6 +122,7 @@ export default function Dashboard() {
             }
           }
         }
+        useStore.getState().updateAgentScript(agentToRun, currentScriptCode);
 
         const jsonBlocks = [...currentScriptCode.matchAll(/```json\s*([\s\S]*?)\s*```/g)];
         for (const match of jsonBlocks) {
