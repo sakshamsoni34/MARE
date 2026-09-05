@@ -34,7 +34,9 @@ function DatabaseHydration({ children }: { children: React.ReactNode }) {
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
-    <SessionProvider>
+    // refetchInterval will check the session status every 5 minutes (300 seconds).
+    // If the token has expired, NextAuth will automatically log the user out across the app.
+    <SessionProvider refetchInterval={5 * 60}>
       <DatabaseHydration>
         {children}
       </DatabaseHydration>

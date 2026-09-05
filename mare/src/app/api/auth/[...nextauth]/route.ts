@@ -10,6 +10,10 @@ const authOptions: NextAuthOptions = {
         }),
     ],
     secret: process.env.NEXTAUTH_SECRET,
+    session: {
+        strategy: 'jwt',
+        maxAge: 60 * 60, // 1 hour token expiration (change to 2 * 60 * 60 for 2 hours)
+    },
     callbacks: {
         async signIn({ user, account, profile }) {
             if (account?.provider === 'google' && user.email) {

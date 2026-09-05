@@ -1,39 +1,31 @@
-import mysql.connector
+import sqlite3
 import os
-from dotenv import load_dotenv
-
-load_dotenv(dotenv_path="../.env")
 
 def clear_db():
+    db_path = os.path.join(os.path.dirname(__file__), 'mare.db')
     try:
-        conn = mysql.connector.connect(
-            host="localhost",
-            user="root",
-            password="Saksham@2006",
-            database="mare"
-        )
+        conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
 
         tables = [
-            "chat_messages",
-            "chat_sessions",
-            "saved_files",
+            "users",
+            "projects",
+            "files",
+            "conversations",
             "workflows",
-            "ui_events",
-            "agents",
-            "users"
+            "agents_state"
         ]
 
         for table in tables:
-            cursor.execute(f"TRUNCATE TABLE {table}")
+            cursor.execute(f"DELETE FROM {table}")
 
         conn.commit()
         print("All mock data removed successfully! Database is completely empty.")
 
-    except mysql.connector.Error as err:
+    except sqlite3.Error as err:
         print(f"Error: {err}")
     finally:
-        if 'conn' in locals() and conn.is_connected():
+        if 'conn' in locals():
             cursor.close()
             conn.close()
 
