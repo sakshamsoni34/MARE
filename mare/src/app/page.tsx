@@ -52,27 +52,7 @@ export default function RootPage() {
               
               <ParticleSphere />
               
-              {status === 'authenticated' && !activeProject ? (
-                <motion.div 
-                  initial={{ opacity: 0, y: -20, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  transition={{ duration: 0.4, ease: "easeOut" }}
-                  className="absolute top-8 right-8 z-50 flex flex-col items-start gap-4 bg-[#141414]/80 p-6 rounded-2xl backdrop-blur-xl border border-white/5 shadow-2xl max-w-sm overflow-hidden group"
-                >
-                  <div className="absolute inset-0 bg-gradient-to-br from-brand-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                  <div className="relative z-10">
-                    <div className="text-white text-base font-semibold tracking-wide mb-1">Workspace Required</div>
-                    <div className="text-text-secondary text-sm mb-4">Select a local directory to initialize the multi-agent environment.</div>
-                    <button 
-                      onClick={handleOpenFolder} 
-                      className="flex items-center gap-2 px-5 py-2.5 w-full justify-center bg-brand-600 hover:bg-brand-500 text-white text-sm rounded-xl font-medium transition-all shadow-[0_0_20px_rgba(124,58,237,0.4)] hover:shadow-[0_0_30px_rgba(124,58,237,0.6)] transform hover:-translate-y-0.5 active:scale-95"
-                    >
-                      <Folder size={18} />
-                      Select Local Folder
-                    </button>
-                  </div>
-                </motion.div>
-              ) : null}
+
 
               {/* Logo / Central Element */}
               <motion.div 
@@ -92,10 +72,7 @@ export default function RootPage() {
                 <div className="absolute w-[350px] h-[350px] bg-black/70 rounded-full blur-3xl" />
                 
                 {/* Crisp White Logo with Mask to hide hard edges */}
-                <motion.img
-                  initial={{ filter: "brightness(1)", y: 10 }}
-                  animate={{ filter: "brightness(1.2)", y: 0 }}
-                  transition={{ duration: 2, repeat: Infinity, repeatType: "mirror", ease: "easeInOut" }}
+                <img
                   src="/logo.png?v=2"
                   alt="MARE Logo"
                   className="w-[480px] max-w-[90%] pointer-events-none mix-blend-screen brightness-110 contrast-125 drop-shadow-[0_0_20px_rgba(167,139,250,0.4)] relative z-10 -translate-x-6"

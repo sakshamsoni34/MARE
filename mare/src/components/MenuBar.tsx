@@ -141,17 +141,17 @@ export default function MenuBar({ onNewFile, onNewFolder, showProfile = false, s
     exit: { opacity: 0, y: -5, scale: 0.95, transition: { duration: 0.1, ease: "easeIn" } }
   };
 
-  const renderDropdown = () => {
-    if (!activeMenu) return null;
+  const renderNavDropdown = () => {
+    if (!activeMenu || activeMenu === 'Profile') return null;
 
-    const DropdownWrapper = ({ children, left, right }: any) => (
+    const DropdownWrapper = ({ children, left }: any) => (
       <motion.div
         variants={dropdownVariants}
         initial="hidden"
         animate="visible"
         exit="exit"
-        className={`absolute top-full mt-1 py-1.5 bg-[#141414]/95 backdrop-blur-xl border border-white/10 shadow-2xl rounded-xl z-50 overflow-hidden ${left !== undefined ? `left-[${left}px]` : ''} ${right !== undefined ? `right-${right}` : ''}`}
-        style={left !== undefined ? { left } : { right }}
+        className="absolute top-full mt-1 py-1.5 bg-[#141414]/95 backdrop-blur-xl border border-white/10 shadow-2xl rounded-xl z-50 overflow-hidden"
+        style={{ left }}
       >
         {children}
       </motion.div>
@@ -204,10 +204,22 @@ export default function MenuBar({ onNewFile, onNewFolder, showProfile = false, s
         </div></DropdownWrapper>
       );
     }
-    if (activeMenu === 'Profile') {
-      return (
-        <DropdownWrapper right={4}><div className="w-64">
-          {status === 'authenticated' ? (
+    return null;
+  };
+
+  const renderProfileDropdown = () => {
+    if (activeMenu !== 'Profile') return null;
+
+    return (
+      <motion.div
+        variants={dropdownVariants}
+        initial="hidden"
+        animate="visible"
+        exit="exit"
+        className="absolute top-full right-0 mt-2 py-1.5 bg-[#141414]/95 backdrop-blur-xl border border-white/10 shadow-2xl rounded-xl z-50 overflow-hidden"
+      >
+        <div className="w-64 text-left">
+          {status === 'authenticated' && session ? (
             <>
               <div className="px-6 py-3 flex flex-col gap-0.5 bg-white/5">
                 <div className="text-white font-medium text-sm">{session.user?.name}</div>
@@ -222,10 +234,9 @@ export default function MenuBar({ onNewFile, onNewFolder, showProfile = false, s
           ) : (
             <MenuItem label="Sign In" onClick={() => handleAction('Sign In')} />
           )}
-        </div></DropdownWrapper>
-      );
-    }
-    return null;
+        </div>
+      </motion.div>
+    );
   };
 
   const navItems: MenuState[] = ['File', 'Edit', 'View', 'Terminal', 'Help'];
@@ -248,13 +259,13 @@ export default function MenuBar({ onNewFile, onNewFolder, showProfile = false, s
             </div>
           ))}
           <AnimatePresence>
-            {renderDropdown()}
+            {renderNavDropdown()}
           </AnimatePresence>
         </div>
       </div>
 
       <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-xs font-semibold tracking-[0.2em] text-white/40 uppercase">
-        MARE Workspace
+        MARE
       </div>
 
       <div className="flex items-center justify-end h-full flex-1 gap-2.5 pr-2">
@@ -297,15 +308,20 @@ export default function MenuBar({ onNewFile, onNewFolder, showProfile = false, s
           )}
           
           {(showProfile || status === 'authenticated') && (
-            <div
-              className={`p-1 ml-3 rounded-full cursor-pointer flex items-center justify-center border transition-all ${activeMenu === 'Profile' ? 'border-brand-400 bg-white/10' : 'border-transparent hover:border-white/20'}`}
-              onClick={() => setActiveMenu(activeMenu === 'Profile' ? null : 'Profile')}
-            >
-              {session?.user?.image ? (
-                <img src={session.user.image} alt="Profile" className="w-6 h-6 rounded-full" referrerPolicy="no-referrer" />
-              ) : (
-                <UserCircle size={20} strokeWidth={1.5} />
-              )}
+            <div className="relative">
+              <div
+                className={`p-1 ml-3 rounded-full cursor-pointer flex items-center justify-center border transition-all ${activeMenu === 'Profile' ? 'border-brand-400 bg-white/10' : 'border-transparent hover:border-white/20'}`}
+                onClick={() => setActiveMenu(activeMenu === 'Profile' ? null : 'Profile')}
+              >
+                {session?.user?.image ? (
+                  <img src={session.user.image} alt="Profile" className="w-6 h-6 rounded-full" referrerPolicy="no-referrer" />
+                ) : (
+                  <UserCircle size={20} strokeWidth={1.5} />
+                )}
+              </div>
+              <AnimatePresence>
+                {renderProfileDropdown()}
+              </AnimatePresence>
             </div>
           )}
         </div>
