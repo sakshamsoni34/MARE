@@ -1,4 +1,5 @@
 import os
+import json
 import logging
 from datetime import datetime, timezone
 import httpx
@@ -8,36 +9,65 @@ from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from contextlib import asynccontextmanager
 
-from models import AgentRequest, UIEventRequest, SyncFileRequest, SyncConversationRequest, SyncWorkflowRequest, SyncAgentStateRequest
+from models import (
+    AgentRequest, 
+    UIEventRequest, 
+    SyncFileRequest, 
+    SyncConversationRequest, 
+    SyncWorkflowRequest, 
+    SyncAgentStateRequest,
+    RAGIngestRequest,
+    RAGQueryRequest,
+    RAGReindexRequest
+)
 from mistral_service import generate_mistral_stream
 from database import get_db_pool
+from rag_service import rag_service
 
 load_dotenv()
+load_dotenv("../.env")
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 MISTRAL_API_KEY = os.getenv("MISTRAL_API_KEY", "")
-if not MISTRAL_API_KEY:
-    logger.warning("MISTRAL_API_KEY is missing in your .env file. The agent will not be able to connect to the Mistral API.")
+if GEMINI_API_KEY:
+    logger.info("Google Gemini Engine active.")
+elif MISTRAL_API_KEY:
+    logger.info("Mistral Engine active (Intelligent RAG fallback enabled).")
+else:
+    logger.info("Local Intelligent RAG Engine active.")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Initialize the HTTPX client for connection pooling
     app.state.client = httpx.AsyncClient()
     
+    # Initialize RAG vector store and index domain knowledge + workspace files
+    try:
+        await rag_service.initialize()
+        await rag_service.sync_workspace_files_to_rag()
+        logger.info("RAG Engine pre-flight initialization and workspace file sync completed.")
+    except Exception as e:
+        logger.error(f"Failed to initialize RAG Engine on startup: {e}")
+    
     yield
     
     # Close the client on shutdown
     await app.state.client.aclose()
 
-app = FastAPI(lifespan=lifespan, title="MARE API")
+app = FastAPI(lifespan=lifespan, title="MARE Multi-Agent RAG Platform API")
 
 app.add_middleware(
     CORSMiddleware,
-    # Use specific origins in production instead of "*"
-    allow_origins=[os.getenv("FRONTEND_URL", "http://localhost:3000"), "http://127.0.0.1:3000"],
+    allow_origins=[
+        os.getenv("FRONTEND_URL", "http://localhost:3000"), 
+        "http://127.0.0.1:3000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3001"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -53,6 +83,8 @@ async def get_db(request: Request):
     finally:
         await conn.close()
 
+# ----------------- AGENT CHAT & STREAMING -----------------
+
 @app.post("/api/agent")
 async def handle_agent_request(body: AgentRequest, client: httpx.AsyncClient = Depends(get_client)):
     current_key = os.getenv("MISTRAL_API_KEY", "")
@@ -67,9 +99,109 @@ async def handle_agent_request(body: AgentRequest, client: httpx.AsyncClient = D
         media_type="text/event-stream"
     )
 
+# ----------------- RAG KNOWLEDGE BASE APIS -----------------
+
+@app.get("/api/rag/stats")
+async def get_rag_stats():
+    """Returns total indexed documents, chunks, sources, and vectorizer health."""
+    try:
+        stats = await rag_service.get_stats()
+        return JSONResponse(content={"status": "success", "stats": stats})
+    except Exception as e:
+        logger.error(f"Error fetching RAG stats: {e}")
+        return JSONResponse(content={"status": "error", "message": str(e)}, status_code=500)
+
+@app.get("/api/rag/documents")
+async def list_rag_documents():
+    """List all indexed documents, categories, and chunk breakdown."""
+    try:
+        docs = await rag_service.list_documents()
+        return JSONResponse(content={"status": "success", "documents": docs})
+    except Exception as e:
+        logger.error(f"Error listing RAG documents: {e}")
+        return JSONResponse(content={"status": "error", "message": str(e)}, status_code=500)
+
+@app.post("/api/rag/ingest")
+async def ingest_rag_document(body: RAGIngestRequest):
+    """Ingest custom text document or reference note into RAG vector store."""
+    try:
+        current_key = os.getenv("MISTRAL_API_KEY", "")
+        doc_id = await rag_service.ingest_document(
+            title=body.title,
+            content=body.content,
+            source=body.source or "custom_upload",
+            category=body.category or "documentation",
+            agent_target=body.agent_target or "all",
+            metadata=body.metadata or {},
+            mistral_api_key=current_key
+        )
+        return JSONResponse(content={
+            "status": "success",
+            "message": f"Document '{body.title}' successfully ingested and indexed into RAG store.",
+            "doc_id": doc_id,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        })
+    except Exception as e:
+        logger.error(f"Error ingesting into RAG: {e}")
+        return JSONResponse(content={"status": "error", "message": str(e)}, status_code=500)
+
+@app.delete("/api/rag/documents/{doc_id}")
+async def delete_rag_document(doc_id: str):
+    """Delete a document and all its chunks from RAG vector store."""
+    try:
+        success = await rag_service.delete_document(doc_id)
+        return JSONResponse(content={"status": "success", "message": f"Document '{doc_id}' deleted."})
+    except Exception as e:
+        logger.error(f"Error deleting RAG document: {e}")
+        return JSONResponse(content={"status": "error", "message": str(e)}, status_code=500)
+
+@app.post("/api/rag/query")
+async def query_rag_endpoint(body: RAGQueryRequest):
+    """Query RAG store directly to inspect semantic relevance scores and retrieved chunks for any agent."""
+    try:
+        current_key = os.getenv("MISTRAL_API_KEY", "")
+        prompt_block, sources_meta = await rag_service.retrieve_context(
+            query=body.query,
+            agent_name=body.agent_name or "all",
+            top_k=body.top_k or 4,
+            category=body.category,
+            mistral_api_key=current_key
+        )
+        return JSONResponse(content={
+            "status": "success",
+            "query": body.query,
+            "agent_name": body.agent_name,
+            "retrieved_count": len(sources_meta),
+            "sources": sources_meta,
+            "context_prompt_block": prompt_block
+        })
+    except Exception as e:
+        logger.error(f"Error querying RAG: {e}")
+        return JSONResponse(content={"status": "error", "message": str(e)}, status_code=500)
+
+@app.post("/api/rag/reindex")
+async def reindex_rag_endpoint(body: RAGReindexRequest):
+    """Force re-index workspace files and refresh domain knowledge embeddings."""
+    try:
+        current_key = os.getenv("MISTRAL_API_KEY", "")
+        await rag_service.initialize()
+        if body.include_workspace_files:
+            await rag_service.sync_workspace_files_to_rag(mistral_api_key=current_key)
+        stats = await rag_service.get_stats()
+        return JSONResponse(content={
+            "status": "success",
+            "message": "RAG Knowledge Base reindexed successfully.",
+            "stats": stats,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        })
+    except Exception as e:
+        logger.error(f"Error reindexing RAG: {e}")
+        return JSONResponse(content={"status": "error", "message": str(e)}, status_code=500)
+
+# ----------------- UI EVENTS & WORKSPACE SYNC -----------------
+
 @app.post("/api/event")
 async def handle_ui_event(body: UIEventRequest):
-    # Specific format for "Open Folder"
     if body.action == "Open Folder":
         return JSONResponse(content={
             "folder": body.folderName,
@@ -81,8 +213,6 @@ async def handle_ui_event(body: UIEventRequest):
         "details": body.details,
         "timestamp": datetime.now(timezone.utc).isoformat()
     })
-
-import json
 
 @app.post("/api/sync/file")
 async def sync_file(body: SyncFileRequest, conn = Depends(get_db)):
@@ -106,8 +236,25 @@ async def sync_file(body: SyncFileRequest, conn = Depends(get_db)):
                 """, (body.node_id, body.parent_id, body.name, body.type, body.content, body.agent_name, agent_contents_json))
             
             await conn.commit()
+
+        # Asynchronously ingest/update file in RAG knowledge base so agents can immediately retrieve its content!
+        if body.type == 'file' and body.content and body.content.strip():
+            try:
+                current_key = os.getenv("MISTRAL_API_KEY", "")
+                await rag_service.ingest_document(
+                    title=f"Workspace File: {body.name}",
+                    content=body.content,
+                    source="workspace_file",
+                    category="code" if body.name.endswith(('.py', '.js', '.ts', '.tsx', '.json', '.sql', '.html', '.css')) else "document",
+                    agent_target=body.agent_name or "all",
+                    metadata={"file_name": body.name, "node_id": body.node_id},
+                    doc_id=f"file_{body.node_id}",
+                    mistral_api_key=current_key
+                )
+            except Exception as rag_err:
+                logger.warning(f"Non-blocking RAG file ingest error: {rag_err}")
             
-        return JSONResponse(content={"status": "success", "message": "File synced", "timestamp": datetime.now(timezone.utc).isoformat()})
+        return JSONResponse(content={"status": "success", "message": "File synced and indexed into RAG", "timestamp": datetime.now(timezone.utc).isoformat()})
     except Exception as e:
         logger.error(f"DB Error sync_file: {e}")
         return JSONResponse(content={"error": str(e)}, status_code=500)
@@ -144,7 +291,6 @@ async def sync_workflow(body: SyncWorkflowRequest, conn = Depends(get_db)):
             nodes_json = json.dumps(body.nodes)
             edges_json = json.dumps(body.edges)
             
-            # Since workflows might be associated with an active project, we either insert or update
             await cursor.execute("""
                 INSERT INTO workflows (project_name, nodes, edges)
                 VALUES (?, ?, ?)
@@ -186,7 +332,7 @@ async def sync_agent_state(body: SyncAgentStateRequest, conn = Depends(get_db)):
 async def oquiron(body: dict):
     return JSONResponse(content={
         "status": "success",
-        "message": "Oquiron model configured successfully.",
+        "message": "Oquiron model configured successfully with active RAG grounding.",
         "timestamp": datetime.now(timezone.utc).isoformat()
     })
 
@@ -219,8 +365,6 @@ async def get_state(conn=Depends(get_db)):
                     "agentContents": agent_contents
                 })
 
-            # Reconstruct file hierarchy (flat list is fine if Zustand logic handles it, but useStore expects nested!)
-            # Wait, actually useStore stores nested `children`. We must nest it.
             node_map = { node["id"]: {**node, "children": []} for node in file_system }
             nested_fs = []
             for node in file_system:
@@ -260,6 +404,9 @@ async def get_state(conn=Depends(get_db)):
             for a in agents_state_data:
                 agentScripts[a["agent_name"]] = a["script_code"]
 
+        # Fetch RAG stats
+        rag_stats = await rag_service.get_stats()
+
         return JSONResponse(content={
             "status": "success",
             "state": {
@@ -269,7 +416,8 @@ async def get_state(conn=Depends(get_db)):
                 "pastConversations": pastConversations,
                 "workflowNodes": workflowNodes,
                 "workflowEdges": workflowEdges,
-                "agentScripts": agentScripts
+                "agentScripts": agentScripts,
+                "ragStats": rag_stats
             }
         })
     except Exception as e:
@@ -280,10 +428,10 @@ async def get_state(conn=Depends(get_db)):
 async def db_test(conn=Depends(get_db)):
     try:
         async with conn.cursor() as cursor:
-            await cursor.execute("SHOW TABLES")
+            await cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
             tables = await cursor.fetchall()
             
-        return JSONResponse(content={"status": "success", "tables": tables})
+        return JSONResponse(content={"status": "success", "tables": [dict(t) for t in tables]})
     except Exception as e:
         logger.error(f"DB Error db-test: {e}")
         return JSONResponse(content={"status": "error", "message": str(e)}, status_code=500)

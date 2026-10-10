@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import dynamic from 'next/dynamic';
-import { Code, Play, Save } from 'lucide-react';
+import { Code, Play, Save, BrainCircuit, X } from 'lucide-react';
 import { useStore, Agent, FileSystemNode } from '@/store/useStore';
 
 // Dynamically import Monaco Editor to reduce initial bundle size
@@ -14,7 +14,24 @@ interface CodeEditorProps {
 }
 
 export default function CodeEditor({ agent }: CodeEditorProps) {
-  const { agentScripts, updateAgentScript, removeOpenAgent, activeAgent, setActiveAgent, runningAgents, setAgentRunning, addTerminalLog, userQuery, selectedFolderId, updateNodeContent, fileSystem, createFile } = useStore();
+  const { 
+    agentScripts, 
+    updateAgentScript, 
+    removeOpenAgent, 
+    activeAgent, 
+    setActiveAgent, 
+    runningAgents, 
+    setAgentRunning, 
+    addTerminalLog, 
+    userQuery, 
+    selectedFolderId, 
+    updateNodeContent, 
+    fileSystem, 
+    createFile,
+    setRAGModalOpen,
+    setAgentRAGSources
+  } = useStore();
+  
   const code = agentScripts[agent] || '';
   const isRunning = runningAgents[agent];
 
@@ -40,7 +57,7 @@ export default function CodeEditor({ agent }: CodeEditorProps) {
     if (isRunning) return;
 
     setAgentRunning(agent, true);
-    addTerminalLog(`> Status: <span class="text-accent-yellow">INITIALIZING ${agent.toUpperCase()}...</span>`);
+    addTerminalLog(`> Status: <span class="text-accent-yellow">INITIALIZING ${agent.toUpperCase()} (RAG GROUNDING ACTIVE)...</span>`);
 
     try {
       const response = await fetch('http://localhost:8555/api/agent', {
@@ -49,7 +66,7 @@ export default function CodeEditor({ agent }: CodeEditorProps) {
         body: JSON.stringify({
           agentName: agent,
           systemPrompt: agentScripts[agent] || 'You are a helpful AI assistant.',
-          userQuery: userQuery || 'Say hello',
+          userQuery: userQuery || 'Generate code',
         }),
       });
 
@@ -60,13 +77,13 @@ export default function CodeEditor({ agent }: CodeEditorProps) {
         return;
       }
 
-      addTerminalLog(`> <span class="text-accent-green">${agent} connected. Task is executing...</span>`);
+      addTerminalLog(`> <span class="text-accent-green">${agent} connected & RAG grounded. Task executing...</span>`);
 
       const reader = response.body?.getReader();
       const decoder = new TextDecoder();
 
       let currentScriptCode = agentScripts[agent] || '';
-      currentScriptCode += `\n\n# --- ${agent} Response ---\n\n`;
+      currentScriptCode += `\n\n# --- ${agent} Grounded Response ---\n\n`;
       updateAgentScript(agent, currentScriptCode);
       
       let lastUpdate = Date.now();
@@ -84,6 +101,9 @@ export default function CodeEditor({ agent }: CodeEditorProps) {
 
               try {
                 const parsed = JSON.parse(dataStr);
+                if (parsed.rag_sources) {
+                  setAgentRAGSources(agent, parsed.rag_sources);
+                }
                 const content = parsed.choices?.[0]?.delta?.content;
                 if (content) {
                   currentScriptCode += content;
@@ -120,7 +140,7 @@ export default function CodeEditor({ agent }: CodeEditorProps) {
         } catch (e) { }
       }
 
-      addTerminalLog(`> Status: <span class="text-accent-green">${agent.toUpperCase()} TASK COMPLETED</span>`);
+      addTerminalLog(`> Status: <span class="text-accent-green">${agent.toUpperCase()} TASK COMPLETED & GROUNDED</span>`);
     } catch (error: any) {
       addTerminalLog(`> <span class="text-accent-red">Error (${agent}):</span> ${error.message}`);
     } finally {
@@ -144,30 +164,58 @@ export default function CodeEditor({ agent }: CodeEditorProps) {
         setShowSavePopup(`Saved in file "${selectedNode.name}"`);
         setTimeout(() => setShowSavePopup(null), 3000);
 
+        try {
+          await fetch('http://localhost:8555/api/sync/file', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              node_id: selectedNode.id,
+              name: selectedNode.name,
+              type: 'file',
+              content: code,
+              agent_name: agent,
+              agent_contents: { [agent]: code }
+            })
+          });
+        } catch (err) { }
+
         return;
       }
     }
 
     try {
       const handle = await (window as any).showSaveFilePicker({
-        suggestedName: `${agent.replace(' ', '_').toLowerCase()}_output.md`,
+        suggestedName: `${agent.replace(' ', '_').toLowerCase()}_output.py`,
         types: [{
-          description: 'Markdown Files',
-          accept: { 'text/markdown': ['.md'] },
+          description: 'Python Files',
+          accept: { 'text/x-python': ['.py', '.md'] },
         }],
       });
       const writable = await handle.createWritable();
       await writable.write(code);
       await writable.close();
       
-      // Add it to the virtual file system
       createFile(selectedFolderId || null, handle.name, code, agent);
       
       addTerminalLog(`> <span class="text-accent-green">Success:</span> Saved ${agent} response to local file system.`);
 
-      // Show popup
       setShowSavePopup(`Saved to local file system`);
       setTimeout(() => setShowSavePopup(null), 3000);
+
+      try {
+        await fetch('http://localhost:8555/api/sync/file', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+              node_id: Date.now().toString(),
+              name: handle.name,
+              type: 'file',
+              content: code,
+              agent_name: agent,
+              agent_contents: { [agent]: code }
+          })
+        });
+      } catch (err) { }
     } catch (err: any) {
       if (err.name !== 'AbortError') {
         addTerminalLog(`> <span class="text-accent-red">Error:</span> Failed to save file: ${err.message}`);
@@ -186,16 +234,40 @@ export default function CodeEditor({ agent }: CodeEditorProps) {
         <div className={`flex items-center gap-3 text-white border-b-2 pb-2 -mb-3 transition-colors ${isActive ? 'border-brand-500' : 'border-transparent'}`}>
           <Code size={16} className={isActive ? 'text-brand-400' : 'text-text-tertiary'} />
           <span className="font-medium">{agent}</span>
-          {isActive && <span className="text-xs text-accent-green bg-accent-green/10 px-2 py-0.5 rounded-full ml-1">Active</span>}
+          
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setRAGModalOpen(true, agent);
+            }}
+            className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-all cursor-pointer shadow-sm ml-1"
+            title="Inspect RAG Knowledge Base for this code agent"
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            <span>RAG Active</span>
+          </button>
         </div>
-        <div className="flex items-center gap-3 pb-2 -mb-3">
+        
+        <div className="flex items-center gap-3.5 pb-2 -mb-3 text-gray-400">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setRAGModalOpen(true, agent);
+            }}
+            className="flex items-center justify-center text-brand-400 hover:text-brand-300 transition-colors cursor-pointer"
+            title="Open RAG Knowledge Base"
+          >
+            <BrainCircuit size={16} />
+          </button>
+          
           <button
             onClick={handleSave}
             className="flex items-center justify-center text-text-tertiary hover:text-accent-blue transition-colors cursor-pointer"
             title="Save to File System"
           >
-            <Save size={14} />
+            <Save size={15} />
           </button>
+          
           <button
             onClick={handleRunAgent}
             disabled={isRunning}
@@ -204,25 +276,27 @@ export default function CodeEditor({ agent }: CodeEditorProps) {
           >
             <Play size={14} fill={isRunning ? "currentColor" : "none"} />
           </button>
-          <span
+          
+          <button
             onClick={(e) => { e.stopPropagation(); removeOpenAgent(agent); }}
-            className="cursor-pointer text-text-tertiary hover:text-accent-red transition-colors text-lg leading-none"
+            className="cursor-pointer text-text-tertiary hover:text-accent-red transition-colors"
             title="Close"
           >
-            ×
-          </span>
+            <X size={16} />
+          </button>
         </div>
       </div>
+      
       <div className="flex-1">
         <Editor
           height="100%"
-          defaultLanguage="python"
+          defaultLanguage={agent.toLowerCase().includes('python') ? 'python' : 'typescript'}
           theme="vs-dark"
           value={code}
           onChange={handleEditorChange}
           options={{
             minimap: { enabled: false },
-            fontSize: 14,
+            fontSize: 13.5,
             lineHeight: 1.5,
             padding: { top: 16, bottom: 16 },
             scrollBeyondLastLine: false,

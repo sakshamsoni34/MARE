@@ -1,5 +1,29 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MessageSquare, Play, Save, Plus, Mic, AudioLines, X, Maximize2, FileText, Bot, Trash2, Send, Loader2, History, MoreHorizontal } from 'lucide-react';
+import { 
+  MessageSquare, 
+  Play, 
+  Save, 
+  Plus, 
+  Mic, 
+  AudioLines, 
+  X, 
+  Maximize2, 
+  FileText, 
+  Bot, 
+  Trash2, 
+  Send, 
+  Loader2, 
+  History, 
+  MoreHorizontal,
+  BrainCircuit,
+  Database,
+  Sparkles,
+  BookOpen,
+  Layers,
+  CheckCircle2,
+  ExternalLink,
+  Copy
+} from 'lucide-react';
 import { useStore, Agent, FileSystemNode } from '@/store/useStore';
 import { useSession } from 'next-auth/react';
 
@@ -9,100 +33,114 @@ interface ChatInterfaceProps {
 
 const AGENT_CONFIGS: Record<string, { description: string, prompts: string[] }> = {
   'Researcher Agent': {
-    description: "I gather, analyze, and synthesize information to support your projects.",
-    prompts: ["Find latest research on AI", "Summarize this topic", "Find sources for my claim", "Extract key data points"]
+    description: "I gather, analyze, and synthesize information grounded in peer-reviewed science and technical documentation.",
+    prompts: ["Find latest research on Multi-Agent RAG", "Summarize the architecture", "Find sources for our design", "Extract key empirical data points"]
   },
   'Planner Agent': {
-    description: "I help structure your projects, break down goals, and create actionable roadmaps.",
-    prompts: ["Create a project timeline", "Break down this goal", "What are the dependencies?", "Draft a daily plan"]
+    description: "I structure projects, break down goals via CPM/WBS, and create resilient roadmaps.",
+    prompts: ["Create a project roadmap with CPM", "Decompose milestones and quality gates", "What are the critical dependencies?", "Draft an executive execution plan"]
   },
   'Executor Agent': {
-    description: "I take actionable steps and execute tasks according to the plan.",
-    prompts: ["Execute the next step", "Run the deployment script", "Process the queue", "Complete pending tasks"]
+    description: "I execute tasks, orchestrate APIs, and manage integrations according to the plan.",
+    prompts: ["Execute the next deployment step", "Run the API integration pipeline", "Process the task queue", "Complete pending execution actions"]
   },
   'Reviewer Agent': {
-    description: "I review outputs, code, or documents for quality, accuracy, and improvements.",
-    prompts: ["Review this draft", "Check for errors", "Suggest improvements", "Verify compliance"]
+    description: "I review code and documents for quality, security, and architectural best practices.",
+    prompts: ["Review this implementation", "Audit for security vulnerabilities", "Suggest performance optimizations", "Verify framework compliance"]
   },
   'Designer Agent': {
-    description: "I assist with creative tasks, UI/UX design concepts, and visual structuring.",
-    prompts: ["Suggest a color palette", "Design a layout", "Improve this UI", "Create wireframe ideas"]
+    description: "I design modern, high-contrast UI/UX layouts, color palettes, and component systems.",
+    prompts: ["Suggest a glassmorphic color palette", "Design dashboard layout hierarchy", "Improve micro-animations", "Create responsive component specs"]
   },
   'Tester Agent': {
-    description: "I generate test cases, run QA checks, and identify potential bugs.",
-    prompts: ["Generate unit tests", "Test this endpoint", "Find edge cases", "Run integration tests"]
+    description: "I generate test cases, run QA matrices, and discover boundary edge cases.",
+    prompts: ["Generate comprehensive unit tests", "Test API edge cases and limits", "Design fuzzing test scenarios", "Run regression verification"]
   },
   'Task Decomposer Agent': {
-    description: "I specialize in breaking complex problems into smaller, manageable sub-tasks.",
-    prompts: ["Break down this feature", "Create sub-tasks", "Identify milestones", "Simplify this problem"]
+    description: "I break complex strategic plans into atomic, parallelizable units and dependency DAGs.",
+    prompts: ["Decompose this feature into atomic tasks", "Create a dependency DAG", "Identify parallel tasks", "Order by topological sort"]
   },
   'Goal Manager Agent': {
-    description: "I track overall progress and ensure all tasks align with the main objectives.",
-    prompts: ["Check project progress", "Are we on track?", "Update the goal status", "Realign priorities"]
+    description: "I track OKRs, detect scope drift, mitigate blockers, and verify milestone gates.",
+    prompts: ["Check project OKR progress", "Detect any scope creep or drift", "Resolve current blockers", "Generate milestone status report"]
   },
   'Web Search Agent': {
-    description: "I scour the internet to find relevant articles, data, and answers in real-time.",
-    prompts: ["Search for latest news", "Find tutorials on this", "Look up this error", "Find alternatives to X"]
+    description: "I retrieve, corroborate, and rank real-time information from credible online sources.",
+    prompts: ["Search latest news on AI agents", "Find authoritative API docs", "Corroborate claims across sources", "Extract verified links and data"]
   },
   'Academic Research Agent': {
-    description: "I search academic databases, find papers, and help format citations.",
-    prompts: ["Find papers on this", "Summarize this abstract", "Format these citations", "Look up author publications"]
+    description: "I search academic databases, analyze experimental methodologies, and format APA/IEEE citations.",
+    prompts: ["Find arXiv papers on RAG architectures", "Summarize paper methodology and limitations", "Format IEEE citations", "Compare contrasting study conclusions"]
   },
   'Browser Agent': {
-    description: "I navigate web pages, scrape content, and interact with web interfaces.",
-    prompts: ["Scrape this website", "Navigate to this URL", "Extract table data", "Monitor this page"]
+    description: "I extract structured data, parse DOM trees, and scrape web content with zero noise.",
+    prompts: ["Extract structured table data", "Scrape webpage content", "Parse semantic HTML hierarchy", "Extract metadata and articles"]
   },
   'News Agent': {
-    description: "I aggregate and summarize the latest news articles across various domains.",
-    prompts: ["Get today's headlines", "Find news on tech", "Summarize this article", "Monitor this topic"]
+    description: "I aggregate breaking news, corroborate facts across outlets, and structure chronological timelines.",
+    prompts: ["Get latest tech headlines", "Structure event timeline", "Summarize industry updates", "Analyze market impact"]
+  },
+  'Code Agent': {
+    description: "I author clean, modular, and production-grade software architectures following SOLID principles.",
+    prompts: ["Design a scalable service layer", "Refactor module with clean architecture", "Write typed async endpoints", "Implement robust error handling"]
+  },
+  'Python Agent': {
+    description: "I write idiomatic Python 3.10+, async concurrency, type hints, and pytest fixtures.",
+    prompts: ["Write an async pipeline with aiosqlite", "Optimize algorithm time complexity", "Create Pydantic models with validation", "Write pytest fixtures"]
+  },
+  'Automation Agent': {
+    description: "I design CI/CD pipelines, Docker scripts, webhook handlers, and automated workflows.",
+    prompts: ["Create a GitHub Actions CI/CD workflow", "Design automated testing pipeline", "Write cron automation script", "Implement webhook dispatcher"]
   },
   'Data Analysis Agent': {
-    description: "I clean, process, and analyze datasets to uncover trends and insights.",
-    prompts: ["Analyze this dataset", "Find trends in data", "Clean this CSV", "Calculate key metrics"]
+    description: "I perform EDA, calculate descriptive and inferential statistics, and uncover actionable insights.",
+    prompts: ["Perform EDA on dataset", "Calculate correlation matrix and anomalies", "Run statistical hypothesis tests", "Extract actionable business ROI"]
   },
   'Visualization Agent': {
-    description: "I create charts, graphs, and visual representations of your data.",
-    prompts: ["Plot this data", "Create a bar chart", "Visualize the trend", "Generate a dashboard"]
+    description: "I select optimal chart types, accessible palettes, and design interactive dashboards.",
+    prompts: ["Recommend chart type for time-series", "Design KPI dashboard layout", "Create high-contrast color scheme", "Suggest interactive visual controls"]
   },
   'Validation Agent': {
-    description: "I validate data formats, schemas, and ensure outputs meet requirements.",
-    prompts: ["Validate this JSON", "Check schema compliance", "Verify data types", "Test constraints"]
+    description: "I perform rigorous QA, validate JSON schemas, verify math logic, and detect contradictions.",
+    prompts: ["Validate JSON schema compliance", "Verify calculation correctness", "Find logical contradictions", "Audit boundary constraints"]
   },
   'Report Generator Agent': {
-    description: "I compile data and summaries into well-structured, comprehensive reports.",
-    prompts: ["Generate weekly report", "Compile summary", "Export to PDF", "Format findings"]
+    description: "I synthesize multi-agent findings into executive summaries using the Minto Pyramid Principle.",
+    prompts: ["Generate executive summary report", "Synthesize findings from all agents", "Format report with action items", "Export structured markdown"]
   },
   'Presentation Agent': {
-    description: "I help draft slides, talking points, and presentation structures.",
-    prompts: ["Draft a 5-slide deck", "Create speaking notes", "Structure this pitch", "Summarize for execs"]
+    description: "I transform long-form analysis into compelling pitch decks and visual slide outlines.",
+    prompts: ["Draft a 5-slide pitch deck", "Create slide outlines with speaker notes", "Design visual suggestions per slide", "Structure executive presentation"]
   },
   'Export Agent': {
-    description: "I format and export your project data into various file formats (CSV, PDF, etc).",
-    prompts: ["Export as CSV", "Convert to Markdown", "Save as JSON", "Prepare download package"]
+    description: "I format, serialize, and validate data for PDF, CSV, JSON, Markdown, and LaTeX export.",
+    prompts: ["Format data as clean CSV", "Prepare markdown for PDF export", "Validate JSON schema for export", "Generate structured LaTeX"]
   },
   'Live Workflow Agent': {
-    description: "I monitor and manage real-time active workflows and orchestrate processes.",
-    prompts: ["Show active workflows", "Monitor execution", "Optimize pipeline", "Handle this event"]
+    description: "I monitor and orchestrate real-time dynamic DAG workflows with automated retries.",
+    prompts: ["Monitor active DAG execution", "Handle node retry with backoff", "Optimize pipeline concurrency", "Prevent graph deadlocks"]
   },
   'Agent Communication Agent': {
-    description: "I route messages, handle IPC, and coordinate tasks between other agents.",
-    prompts: ["Send message to planner", "Broadcast update", "Check agent status", "Resolve conflicts"]
+    description: "I manage inter-agent IPC routing, shared blackboard context, and consensus arbitration.",
+    prompts: ["Route payload to Planner Agent", "Broadcast update to blackboard", "Arbitrate conflicting agent outputs", "Check blackboard shared context"]
   },
   'Logs Agent': {
-    description: "I monitor system logs, analyze errors, and track activity history.",
-    prompts: ["Show recent errors", "Filter logs by tag", "Analyze stack trace", "Export today's logs"]
+    description: "I audit system execution, parse stack traces, and track performance telemetry.",
+    prompts: ["Show recent system errors", "Analyze execution stack trace", "Track token consumption metrics", "Export structured audit logs"]
   },
   'Events Agent': {
-    description: "I handle system events, triggers, and scheduled tasks in the environment.",
-    prompts: ["List active triggers", "Handle this webhook", "Schedule a cron job", "Monitor event stream"]
+    description: "I manage the real-time event bus, topic pub/sub subscriptions, and scheduled triggers.",
+    prompts: ["List active event subscriptions", "Emit workflow completion event", "Schedule periodic trigger", "Monitor event stream"]
   },
   'Orqion': {
-    description: "I am your general-purpose AI assistant. I can help you with normal daily tasks, writing code, answering questions, and anything else you need.",
-    prompts: ["How do I start?", "Write a Python script", "Summarize this page", "Explain this concept"]
+    description: "I am your autonomous general-purpose AI workspace assistant, grounded in project files and RAG memory.",
+    prompts: ["Create a new file in workspace", "How is our multi-agent RAG structured?", "Write an async Python module", "Coordinate a research workflow"]
+  },
+  'Multi-Agent Hub': {
+    description: "Collaborative multi-agent hub. Coordinate cross-agent context chaining and consensus pipelines.",
+    prompts: ["Chain Planner -> Code -> Validation", "Synthesize full project strategy", "Execute multi-agent research sprint"]
   }
 };
-
-const escapeRegExp = (string: string) => string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 const getAgentTheme = (agentName: string) => {
   const themes = [
@@ -120,93 +158,244 @@ const getAgentTheme = (agentName: string) => {
   return themes[Math.abs(hash) % themes.length];
 };
 
-const formatMarkdown = (text: string, agentTheme: any) => {
-  if (!text) return null;
-  const lines = text.split('\n');
-  return lines.map((line, i) => {
-    if (line.trim() === '---') {
-      return <hr key={i} className="my-4 border-white/5" />;
-    }
+const CodeSnippet = ({ code, language }: { code: string; language: string }) => {
+  const [copied, setCopied] = useState(false);
 
-    if (line.includes('[[VIEW_WORKFLOW]]')) {
-      return (
-        <div key={i} className="my-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
-          <button
-            onClick={() => useStore.getState().setWorkflowOpen(true)}
-            className={`group flex items-center gap-2.5 px-5 py-2.5 rounded-xl border ${agentTheme.border} ${agentTheme.bg} hover:bg-white/10 ${agentTheme.text} transition-all duration-300 shadow-sm hover:shadow-md hover:-translate-y-0.5 relative overflow-hidden`}
+  return (
+    <div className="my-3.5 rounded-xl border border-white/10 bg-[#0d0d11] overflow-hidden shadow-lg">
+      <div className="flex items-center justify-between px-3.5 py-1.5 bg-white/5 border-b border-white/10 text-gray-400 text-[11.5px] font-mono">
+        <span className="font-semibold text-gray-300">{language || 'code'}</span>
+        <button
+          onClick={() => {
+            navigator.clipboard.writeText(code);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+          }}
+          className="flex items-center gap-1.5 hover:text-white transition-colors cursor-pointer text-gray-400"
+        >
+          {copied ? <CheckCircle2 size={12} className="text-emerald-400" /> : <Copy size={12} />}
+          <span>{copied ? 'Copied' : 'Copy code'}</span>
+        </button>
+      </div>
+      <pre className="p-4 overflow-x-auto font-mono text-[12.5px] leading-relaxed text-gray-200">
+        <code>{code}</code>
+      </pre>
+    </div>
+  );
+};
+
+const formatInline = (text: string, agentTheme: any) => {
+  return text
+    .replace(/\*\*(.*?)\*\*/g, '<strong class="text-white font-semibold tracking-wide">$1</strong>')
+    .replace(/\*(.*?)\*/g, '<em class="italic text-gray-300">$1</em>')
+    .replace(/`(.*?)`/g, `<code class="${agentTheme.bg} text-brand-300 px-1.5 py-0.5 rounded text-[12px] font-mono border ${agentTheme.border}">$1</code>`)
+    .replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" target="_blank" rel="noreferrer" class="text-brand-400 hover:underline underline-offset-2">$1</a>');
+};
+
+const renderTextAndTables = (textBlock: string, agentTheme: any, keyPrefix: number) => {
+  const lines = textBlock.split('\n');
+  const elements: React.ReactNode[] = [];
+  let i = 0;
+
+  while (i < lines.length) {
+    const line = lines[i];
+
+    // Interactive Workflow trigger
+    if (line.includes('[[VIEW_WORKFLOW]]') || line.includes('[[VIEW WORKFLOW]]')) {
+      elements.push(
+        <div key={`${keyPrefix}-wf-${i}`} className="my-3.5 p-3 rounded-xl bg-brand-500/10 border border-brand-500/25 flex items-center justify-between shadow-sm">
+          <div className="flex items-center gap-2 text-brand-300 text-xs font-medium">
+            <BrainCircuit size={16} className="text-brand-400" />
+            <span>Interactive Workflow Diagram Generated</span>
+          </div>
+          <button 
+            onClick={() => useStore.getState().toggleWorkflow()} 
+            className="px-3 py-1.5 rounded-lg bg-brand-500/20 hover:bg-brand-500/35 text-brand-300 hover:text-white text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer border border-brand-500/30"
           >
-            <div className={`absolute inset-0 bg-gradient-to-r ${agentTheme.glow} to-transparent opacity-0 group-hover:opacity-20 transition-opacity duration-300`}></div>
-            <div className={`p-1 rounded-md ${agentTheme.iconBg} relative z-10`}>
-              <Maximize2 size={14} className={agentTheme.text} />
-            </div>
-            <span className="font-medium text-[13px] relative z-10 tracking-wide text-gray-200 group-hover:text-white transition-colors">
-              View Generated Workflow
-            </span>
+            <ExternalLink size={12} />
+            Open Workflow Canvas
           </button>
         </div>
       );
+      i++;
+      continue;
     }
 
-    const formatted = line
-      .replace(/\*\*(.*?)\*\*/g, `<strong class="${agentTheme.text} font-semibold tracking-wide">$1</strong>`)
-      .replace(/\*(.*?)\*/g, `<em class="italic text-gray-400">$1</em>`)
-      .replace(/`(.*?)`/g, `<code class="${agentTheme.bg} ${agentTheme.text} px-1.5 py-0.5 rounded text-[12px] font-mono border ${agentTheme.border} shadow-sm">$1</code>`)
-      .replace(/\[(.*?)\]\((.*?)\)/g, `<a href="$2" target="_blank" class="${agentTheme.text} hover:underline underline-offset-2 decoration-${agentTheme.text.split('-')[1]}-500/30">$1</a>`)
-      .replace(/^(#{1,6})\s+(.*)$/g, (match, hashes, title) => {
-         const size = Math.max(16 - (hashes.length * 1), 13);
-         return `<div class="font-semibold text-white mt-4 mb-2 tracking-tight flex items-center gap-2" style="font-size: ${size}px;">
-           <div class="w-1.5 h-1.5 rounded-sm ${agentTheme.iconBg}"></div>
-           ${title}
-         </div>`;
-      });
+    // Markdown Table detection
+    if (line.trim().startsWith('|') && line.trim().endsWith('|') && i + 1 < lines.length && lines[i+1].includes('---')) {
+      const tableLines: string[] = [];
+      while (i < lines.length && lines[i].trim().startsWith('|') && lines[i].trim().endsWith('|')) {
+        tableLines.push(lines[i].trim());
+        i++;
+      }
+      if (tableLines.length >= 2) {
+        const headerRow = tableLines[0].split('|').slice(1, -1).map(c => c.trim());
+        const bodyRows = tableLines.slice(2).map(r => r.split('|').slice(1, -1).map(c => c.trim()));
+        elements.push(
+          <div key={`${keyPrefix}-tbl-${i}`} className="my-3.5 overflow-x-auto rounded-xl border border-white/10 bg-black/20 shadow-sm">
+            <table className="w-full text-left border-collapse text-[12.5px]">
+              <thead>
+                <tr className="bg-white/5 border-b border-white/10">
+                  {headerRow.map((h, hIdx) => (
+                    <th key={hIdx} className="p-2.5 font-semibold text-white tracking-wide">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {bodyRows.map((row, rIdx) => (
+                  <tr key={rIdx} className="hover:bg-white/5 transition-colors">
+                    {row.map((cell, cIdx) => (
+                      <td key={cIdx} className="p-2.5 text-gray-300" dangerouslySetInnerHTML={{ __html: formatInline(cell, agentTheme) }} />
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+      }
+      continue;
+    }
 
-    if (line.trim().startsWith('- ')) {
-      return (
-        <div key={i} className="flex gap-3 my-1.5 items-start group">
-          <div className={`mt-2 shrink-0 w-1.5 h-1.5 rounded-sm rotate-45 transition-transform group-hover:scale-125 ${agentTheme.bg} border ${agentTheme.border}`}></div>
-          <span dangerouslySetInnerHTML={{ __html: formatted.substring(2) }} className="text-gray-300" />
+    // Horizontal Divider
+    if (line.trim() === '---' || line.trim() === '***') {
+      elements.push(<hr key={`${keyPrefix}-hr-${i}`} className="my-4 border-white/10" />);
+      i++;
+      continue;
+    }
+
+    // Markdown Headers
+    const headerMatch = line.match(/^(#{1,6})\s+(.*)$/);
+    if (headerMatch) {
+      const level = headerMatch[1].length;
+      const title = headerMatch[2];
+      const sizeClass = level === 1 ? 'text-lg font-bold text-white mt-5 mb-2.5' : level === 2 ? 'text-base font-semibold text-white mt-4 mb-2' : 'text-[14.5px] font-semibold text-white mt-3.5 mb-1.5';
+      elements.push(
+        <div key={`${keyPrefix}-h-${i}`} className={`tracking-tight flex items-center gap-2 ${sizeClass}`}>
+          <span dangerouslySetInnerHTML={{ __html: formatInline(title, agentTheme) }} />
         </div>
       );
+      i++;
+      continue;
     }
 
-    const numListMatch = line.match(/^(\d+\.)\s(.*)/);
-    if (numListMatch) {
-      const remainingFormatted = formatted.replace(/^\d+\.\s/, '');
-      return (
-        <div key={i} className="flex gap-2.5 my-2 items-start group">
-          <span className={`shrink-0 flex items-center justify-center w-5 h-5 rounded-md text-[10px] font-bold ${agentTheme.bg} ${agentTheme.text} border ${agentTheme.border} shadow-sm transition-all group-hover:shadow-md`}>
-            {numListMatch[1].replace('.', '')}
+    // Bullet points
+    if (line.trim().startsWith('- ') || line.trim().startsWith('* ')) {
+      const cleanLine = line.trim().replace(/^[-*]\s+/, '');
+      elements.push(
+        <div key={`${keyPrefix}-li-${i}`} className="flex gap-2.5 my-1.5 items-start group">
+          <div className={`mt-2 shrink-0 w-1.5 h-1.5 rounded-full ${agentTheme.bg} border ${agentTheme.border}`}></div>
+          <span dangerouslySetInnerHTML={{ __html: formatInline(cleanLine, agentTheme) }} className="text-gray-300 leading-relaxed text-[13.5px]" />
+        </div>
+      );
+      i++;
+      continue;
+    }
+
+    // Numbered lists
+    const numMatch = line.match(/^(\d+\.)\s+(.*)/);
+    if (numMatch) {
+      elements.push(
+        <div key={`${keyPrefix}-num-${i}`} className="flex gap-2.5 my-2 items-start group">
+          <span className={`shrink-0 flex items-center justify-center w-5 h-5 rounded-md text-[10px] font-bold ${agentTheme.bg} ${agentTheme.text} border ${agentTheme.border} shadow-sm`}>
+            {numMatch[1].replace('.', '')}
           </span>
-          <span dangerouslySetInnerHTML={{ __html: remainingFormatted }} className="text-gray-300 mt-0.5" />
+          <span dangerouslySetInnerHTML={{ __html: formatInline(numMatch[2], agentTheme) }} className="text-gray-300 mt-0.5 text-[13.5px] leading-relaxed" />
         </div>
       );
+      i++;
+      continue;
     }
 
-    if (line.trim() === '') return <div key={i} className="h-2"></div>;
-
+    // Blockquote
     if (line.trim().startsWith('>')) {
-      return (
-        <div key={i} className={`relative overflow-hidden border-l-2 ${agentTheme.border} pl-4 py-2.5 my-3 text-gray-300/90 italic ${agentTheme.bg} rounded-r-lg`}>
-          <div className={`absolute top-0 right-0 w-16 h-16 bg-gradient-to-bl ${agentTheme.glow} to-transparent opacity-30`}></div>
-          <span dangerouslySetInnerHTML={{ __html: formatted.replace(/^>\s?/, '') }}></span>
+      const quoteText = line.trim().replace(/^>\s?/, '');
+      elements.push(
+        <div key={`${keyPrefix}-quote-${i}`} className={`border-l-2 ${agentTheme.border} pl-3.5 py-1.5 my-2.5 text-gray-300/90 italic ${agentTheme.bg} rounded-r-lg text-[13px]`}>
+          <span dangerouslySetInnerHTML={{ __html: formatInline(quoteText, agentTheme) }}></span>
         </div>
       );
+      i++;
+      continue;
     }
 
-    return <div key={i} dangerouslySetInnerHTML={{ __html: formatted }} className="my-1.5" />;
-  });
+    // Empty lines
+    if (line.trim() === '') {
+      elements.push(<div key={`${keyPrefix}-sp-${i}`} className="h-1.5"></div>);
+      i++;
+      continue;
+    }
+
+    // Standard paragraph
+    elements.push(
+      <div key={`${keyPrefix}-p-${i}`} dangerouslySetInnerHTML={{ __html: formatInline(line, agentTheme) }} className="my-1 text-gray-300 leading-relaxed text-[13.5px]" />
+    );
+    i++;
+  }
+
+  return <React.Fragment key={`block-${keyPrefix}`}>{elements}</React.Fragment>;
+};
+
+const formatMarkdown = (content: string, agentTheme: any) => {
+  const codeBlockRegex = /```([a-zA-Z0-9_\-#+]*)\n([\s\S]*?)```/g;
+  const parts: React.ReactNode[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = codeBlockRegex.exec(content)) !== null) {
+    if (match.index > lastIndex) {
+      const textBefore = content.substring(lastIndex, match.index);
+      parts.push(renderTextAndTables(textBefore, agentTheme, parts.length));
+    }
+    const lang = match[1].trim();
+    const code = match[2];
+    parts.push(<CodeSnippet key={`code-${match.index}`} language={lang} code={code} />);
+    lastIndex = match.index + match[0].length;
+  }
+
+  if (lastIndex < content.length) {
+    const textRemaining = content.substring(lastIndex);
+    parts.push(renderTextAndTables(textRemaining, agentTheme, parts.length));
+  }
+
+  return parts;
 };
 
 export default function ChatInterface({ agent }: ChatInterfaceProps) {
   const { data: session } = useSession();
-  const userId = (session?.user as any)?.id ? parseInt((session?.user as any)?.id) : undefined;
-  const { agentScripts, updateAgentScript, removeOpenAgent, activeAgent, setActiveAgent, runningAgents, setAgentRunning, addTerminalLog, userQuery, selectedFolderId, updateNodeContent, fileSystem, createFile, toggleRightSidebar, pastConversations, savePastConversation, loadPastConversation, deletePastConversation, hubSelectedAgents, toggleHubSelectedAgent } = useStore();
+  const { 
+    agentScripts, 
+    updateAgentScript, 
+    removeOpenAgent, 
+    activeAgent, 
+    setActiveAgent, 
+    runningAgents, 
+    setAgentRunning, 
+    addTerminalLog, 
+    userQuery, 
+    selectedFolderId, 
+    updateNodeContent, 
+    fileSystem, 
+    createFile, 
+    toggleRightSidebar, 
+    pastConversations, 
+    savePastConversation, 
+    loadPastConversation, 
+    deletePastConversation, 
+    hubSelectedAgents, 
+    toggleHubSelectedAgent,
+    setRAGModalOpen,
+    agentRAGSources,
+    setAgentRAGSources
+  } = useStore();
+
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const code = agentScripts[agent] || '';
   const isRunning = runningAgents[agent];
   const scrollRef = useRef<HTMLDivElement>(null);
   const [localQuery, setLocalQuery] = useState('');
   const [expandedSection, setExpandedSection] = useState<{ msgId: string, idx: number } | null>(null);
+  const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null);
   const agentTheme = getAgentTheme(agent);
 
   const initialText = `# ${agent} Script\n\n# Write your ${agent.toLowerCase()} prompt here...\n`;
@@ -219,6 +408,8 @@ export default function ChatInterface({ agent }: ChatInterfaceProps) {
     displayCode = code.substring(initialText.length).trimStart();
   }
   const hasMessages = !isInitialState && !!displayCode;
+
+  const currentRAGSources = agentRAGSources[agent] || [];
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -253,71 +444,15 @@ export default function ChatInterface({ agent }: ChatInterfaceProps) {
     if (isRunning) return;
 
     setAgentRunning(agent, true);
-    addTerminalLog(`> Status: <span class="text-accent-yellow">INITIALIZING ${agent.toUpperCase()}...</span>`);
+    addTerminalLog(`> Status: <span class="text-accent-yellow">INITIALIZING ${agent.toUpperCase()} (RAG RETRIEVAL ACTIVE)...</span>`);
 
     try {
-      const autoWorkflowPrompt = `
+      const autoWorkflowPrompt = `\n[UI WORKFLOW]\nTo show a workflow/diagram, output exact JSON inside a markdown block:\n\`\`\`json\n{\n  "workflow": {\n    "nodes": [\n      { "id": "1", "position": { "x": 100, "y": 100 }, "data": { "label": "Node 1" }, "type": "default" }\n    ],\n    "edges": [\n      { "id": "e1-2", "source": "1", "target": "2", "animated": true }\n    ]\n  }\n}\n\`\`\`\n`;
 
-IMPORTANT: If your response involves a process, plan, or multiple steps, always include a visual workflow representation at the end of your response. Use the following JSON format inside a markdown json block:
-\`\`\`json
-{
-  "workflow": {
-    "nodes": [
-      { "id": "1", "position": { "x": 100, "y": 100 }, "data": { "label": "Step 1" } },
-      { "id": "2", "position": { "x": 350, "y": 100 }, "data": { "label": "Step 2" } }
-    ],
-    "edges": [
-      { "id": "e1-2", "source": "1", "target": "2", "animated": true }
-    ]
-  }
-}
-\`\`\`
-`;
-
-      let systemPromptToUse = agentScripts[agent] || 'You are a helpful AI assistant.';
-
-      systemPromptToUse += `\n\nIMPORTANT FORMATTING RULE: 
-You must structure your response into two parts:
-1. The direct answer (brief, professional, and straight to the point).
-2. Relevant details (code, explanations, background, extra context).
-You must separate them using this EXACT delimiter on its own line:
-===DETAILS===
-Everything before the delimiter is the direct answer. Everything after is the relevant details.
-If your response is just a direct answer and needs no extra details, omit the delimiter.
-If the user asks for code, put a very brief summary before the delimiter, and the entire code block after the delimiter.`;
+      let systemPromptToUse = (AGENT_CONFIGS[agent]?.description || 'You are a helpful AI assistant.') + autoWorkflowPrompt;
       
-      if (agent !== 'Orqion') {
-        systemPromptToUse += autoWorkflowPrompt;
-      } else {
-        systemPromptToUse += `\n\nIMPORTANT: As Orqion, you are a professional AI assistant. You must provide direct, point-to-point responses to the user's queries in a clear and concise manner. Do not generate visual workflows or complex internal structures unless explicitly requested.`;
-      }
-
       if (agent === 'Orqion') {
-        systemPromptToUse += `\n\nAdditionally, you have the ability to perform UI actions in the dashboard on behalf of the user (e.g., create a file, create a folder, or open an agent). 
-CRITICAL RULE: DO NOT output UI action JSON blocks as examples, and DO NOT output them preemptively. ONLY output a UI action JSON block if the user explicitly requests you to perform that exact action. Keep your answers brief, conversational, and simple. Do not overwhelm the user with complex formatting or unsolicited workflows.
-When explicitly requested to perform an action, use this format:
-\`\`\`json
-{
-  "ui_action": {
-    "type": "create_folder",
-    "name": "folder_name"
-  }
-}
-\`\`\`
-Supported types:
-- "create_folder" (requires "name")
-- "create_file" (requires "name", optional "content")
-- "delete_folder" (requires "name")
-- "delete_file" (requires "name")
-- "open_agent" (requires "agentName", e.g., "Planner Agent")
-- "close_agent" (requires "agentName", e.g., "Planner Agent")
-- "save_chat"
-- "clear_chat"
-- "open_terminal"
-- "close_terminal"
-- "open_workflow"
-- "close_workflow"
-`;
+        systemPromptToUse += `\nYou are Orqion, the primary orchestrator. You can perform UI workspace actions by outputting JSON:\n\`\`\`json\n{\n  "ui_action": {\n    "type": "create_file",\n    "name": "example.py",\n    "content": "print('hello')"\n  }\n}\n\`\`\`\n`;
       }
 
       const queryToUse = localQuery.trim() || userQuery || 'Say hello';
@@ -332,7 +467,7 @@ Supported types:
          for (const subAgent of hubSelectedAgents) {
             currentScriptCode += `\n**${subAgent}:**\n\n`;
             updateAgentScript(agent, currentScriptCode);
-            addTerminalLog(`> Status: <span class="text-accent-yellow">HUB: Executing ${subAgent}...</span>`);
+            addTerminalLog(`> Status: <span class="text-accent-yellow">HUB: Executing ${subAgent} with RAG context...</span>`);
 
             const hubSystemPrompt = (AGENT_CONFIGS[subAgent]?.description || 'You are a helpful AI.') + autoWorkflowPrompt + `\n\n[CONTEXT FROM PREVIOUS AGENTS]\n${accumulatedContext}\nPlease build upon the previous responses to accomplish the user's request.`;
             
@@ -368,6 +503,10 @@ Supported types:
                     if (dataStr === '[DONE]') continue;
                     try {
                       const parsed = JSON.parse(dataStr);
+                      if (parsed.rag_sources) {
+                        setAgentRAGSources(subAgent, parsed.rag_sources);
+                        setAgentRAGSources(agent, parsed.rag_sources);
+                      }
                       const content = parsed.choices?.[0]?.delta?.content;
                       if (content) {
                         currentScriptCode += content;
@@ -407,13 +546,12 @@ Supported types:
         return;
       }
 
-      addTerminalLog(`> <span class="text-accent-green">${agent} connected. Task is executing...</span>`);
+      addTerminalLog(`> <span class="text-accent-green">${agent} connected & RAG grounded. Task executing...</span>`);
 
       const reader = response.body?.getReader();
       const decoder = new TextDecoder();
 
       let currentScriptCode = agentScripts[agent] || '';
-
       currentScriptCode += `\n\n**You:** ${queryToUse}\n`;
       currentScriptCode += `\n**${agent}:**\n\n`;
       updateAgentScript(agent, currentScriptCode);
@@ -433,6 +571,9 @@ Supported types:
 
               try {
                 const parsed = JSON.parse(dataStr);
+                if (parsed.rag_sources) {
+                  setAgentRAGSources(agent, parsed.rag_sources);
+                }
                 const content = parsed.choices?.[0]?.delta?.content;
                 if (content) {
                   currentScriptCode += content;
@@ -459,7 +600,6 @@ Supported types:
           if (parsed.workflow && parsed.workflow.nodes && parsed.workflow.edges) {
             useStore.getState().setWorkflowNodes(parsed.workflow.nodes);
             useStore.getState().setWorkflowEdges(parsed.workflow.edges);
-            // Note: We no longer auto-open the workflow; the user clicks the button instead.
             addTerminalLog(`> Status: <span class="text-accent-blue">Generated workflow from response.</span>`);
 
             currentScriptCode = currentScriptCode.replace(match[0], '\n[[VIEW_WORKFLOW]]\n');
@@ -492,8 +632,6 @@ Supported types:
                 if (node) {
                   useStore.getState().deleteNode(node.id);
                   addTerminalLog(`> Status: <span class="text-accent-blue">Orqion deleted ${targetType}: ${action.name}</span>`);
-                } else {
-                  addTerminalLog(`> Error: <span class="text-accent-red">Orqion could not find ${targetType} to delete: ${action.name}</span>`);
                 }
              } else if (action.type === 'open_agent') {
                 useStore.getState().addOpenAgent(action.agentName);
@@ -531,10 +669,9 @@ Supported types:
       
       } // end else for single agent processing
 
-      // Log the conversation to the new API endpoint
       try {
         const fullAgentResponse = currentScriptCode.split(`**${agent}:**\n\n`)[1] || '';
-        const logResponse = await fetch('http://localhost:8555/api/sync/conversation', {
+        await fetch('http://localhost:8555/api/sync/conversation', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -545,16 +682,11 @@ Supported types:
             timestamp: new Date().toISOString()
           })
         });
-        if (logResponse.ok) {
-          const logJson = await logResponse.json();
-          const formattedLog = JSON.stringify(logJson, null, 2).replace(/\n/g, '<br>').replace(/ /g, '&nbsp;');
-          addTerminalLog(`> <span class="text-blue-400">Chat API Log:</span> <br><pre class="text-xs text-gray-300 mt-1">${formattedLog}</pre>`);
-        }
       } catch (logErr) {
         console.error("Failed to log chat:", logErr);
       }
 
-      addTerminalLog(`> Status: <span class="text-accent-green">${agent.toUpperCase()} TASK COMPLETED</span>`);
+      addTerminalLog(`> Status: <span class="text-accent-green">${agent.toUpperCase()} TASK COMPLETED & GROUNDED</span>`);
     } catch (error: any) {
       addTerminalLog(`> <span class="text-accent-red">Error (${agent}):</span> ${error.message}`);
     } finally {
@@ -577,7 +709,7 @@ Supported types:
         setTimeout(() => setShowSavePopup(null), 3000);
 
         try {
-          const logResponse = await fetch('http://localhost:8555/api/sync/file', {
+          await fetch('http://localhost:8555/api/sync/file', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -590,11 +722,6 @@ Supported types:
               agent_contents: { [agent]: code }
             })
           });
-          if (logResponse.ok) {
-            const logJson = await logResponse.json();
-            const formattedLog = JSON.stringify(logJson, null, 2).replace(/\n/g, '<br>').replace(/ /g, '&nbsp;');
-            addTerminalLog(`> <span class="text-blue-400">Save API Response:</span> <br><pre class="text-xs text-gray-300 mt-1">${formattedLog}</pre>`);
-          }
         } catch (apiErr) {
           console.error("Failed to call save API:", apiErr);
         }
@@ -623,7 +750,7 @@ Supported types:
       setTimeout(() => setShowSavePopup(null), 3000);
 
       try {
-        const logResponse = await fetch('http://localhost:8555/api/sync/file', {
+        await fetch('http://localhost:8555/api/sync/file', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -636,11 +763,6 @@ Supported types:
               agent_contents: { [agent]: code }
           })
         });
-        if (logResponse.ok) {
-          const logJson = await logResponse.json();
-          const formattedLog = JSON.stringify(logJson, null, 2).replace(/\n/g, '<br>').replace(/ /g, '&nbsp;');
-          addTerminalLog(`> <span class="text-blue-400">Save API Response:</span> <br><pre class="text-xs text-gray-300 mt-1">${formattedLog}</pre>`);
-        }
       } catch (apiErr) {
         console.error("Failed to call save API:", apiErr);
       }
@@ -658,18 +780,45 @@ Supported types:
       className={`relative flex flex-1 flex-col rounded-xl border bg-[#1e1e1e] overflow-hidden shadow-lg mx-1 min-w-[300px] transition-all ${isActive ? 'border-brand-500/50 ring-1 ring-brand-500/20' : 'border-[var(--color-border-primary)] opacity-90'}`}
       onClick={() => setActiveAgent(agent)}
     >
-      <div className="flex items-center justify-between bg-black/20 backdrop-blur-md px-5 py-4 border-b border-white/5 relative z-10 shadow-sm">
-        <div className="flex items-center gap-2">
-          <span className="font-medium text-[15px] text-blue-400">{agent === 'Orqion' ? 'Orqion' : agent}</span>
+      {/* Agent Chat Header */}
+      <div className="flex items-center justify-between bg-black/20 backdrop-blur-md px-5 py-3.5 border-b border-white/5 relative z-10 shadow-sm">
+        <div className="flex items-center gap-2.5">
+          <span className="font-semibold text-[14px] text-blue-400">{agent === 'Orqion' ? 'Orqion' : agent}</span>
+          
+          {/* RAG Active Indicator Pill */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setRAGModalOpen(true, agent);
+            }}
+            className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/25 hover:bg-emerald-500/20 transition-all cursor-pointer shadow-sm group"
+            title="Click to inspect RAG Knowledge Base & retrieved grounding chunks"
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse group-hover:scale-125 transition-transform" />
+            <span className="font-mono">RAG Grounded</span>
+          </button>
         </div>
-        <div className="flex items-center gap-5 text-gray-400">
+
+        <div className="flex items-center gap-4 text-gray-400">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setRAGModalOpen(true, agent);
+            }}
+            className="flex items-center justify-center hover:text-brand-400 transition-colors cursor-pointer"
+            title="Inspect RAG Knowledge Base for this agent"
+          >
+            <BrainCircuit size={17} strokeWidth={2} className="text-brand-400/80 hover:text-brand-300" />
+          </button>
+
           <button
             onClick={handleSave}
             className="flex items-center justify-center hover:text-white transition-colors cursor-pointer"
-            title="Save"
+            title="Save to File System"
           >
-            <Save size={18} strokeWidth={2} />
+            <Save size={17} strokeWidth={2} />
           </button>
+
           <button
             onClick={(e) => { 
               e.stopPropagation(); 
@@ -683,6 +832,7 @@ Supported types:
           >
             <Plus size={18} strokeWidth={2} />
           </button>
+
           <button
             onClick={(e) => { e.stopPropagation(); setShowHistoryModal(true); }}
             className="flex items-center justify-center hover:text-white transition-colors cursor-pointer"
@@ -690,12 +840,7 @@ Supported types:
           >
             <History size={16} strokeWidth={2} />
           </button>
-          <button
-            className="flex items-center justify-center hover:text-white transition-colors cursor-pointer"
-            title="More Details"
-          >
-            <MoreHorizontal size={18} strokeWidth={2} />
-          </button>
+
           <button
             onClick={(e) => { 
               e.stopPropagation(); 
@@ -708,12 +853,12 @@ Supported types:
             className="flex items-center justify-center hover:text-white transition-colors cursor-pointer ml-1"
             title="Close"
           >
-            <X size={18} strokeWidth={2} />
+            <X size={17} strokeWidth={2} />
           </button>
         </div>
       </div>
+
       <div className="flex flex-1 flex-col overflow-hidden relative">
-        
         {/* Chat History / Initial State Area */}
         <div
           ref={scrollRef}
@@ -726,19 +871,27 @@ Supported types:
                 <Bot size={28} className="text-brand-400" />
               </div>
               <h1 className="text-2xl font-semibold text-white tracking-tight mb-2">{agent}</h1>
-              <p className="text-gray-400 text-center max-w-md mb-10 text-[13.5px] leading-relaxed">
+              <p className="text-gray-400 text-center max-w-md mb-6 text-[13.5px] leading-relaxed">
                 {AGENT_CONFIGS[agent]?.description || "How can I assist you with your tasks today?"}
               </p>
+
+              {/* RAG Status Callout Banner */}
+              <div 
+                onClick={() => setRAGModalOpen(true, agent)}
+                className="mb-8 px-4 py-2.5 rounded-xl border border-emerald-500/20 bg-emerald-500/5 hover:bg-emerald-500/10 transition-all cursor-pointer flex items-center gap-2.5 text-xs text-emerald-300 shadow-sm"
+              >
+                <BrainCircuit size={15} className="text-emerald-400 shrink-0" />
+                <span>RAG Retrieval Active: Grounded on project files and domain knowledge.</span>
+                <span className="text-[10px] text-emerald-400 font-mono underline ml-1">Inspect &rarr;</span>
+              </div>
 
               {AGENT_CONFIGS[agent]?.prompts && agent !== 'Multi-Agent Hub' && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full">
                   {AGENT_CONFIGS[agent].prompts.map((prompt, i) => (
                     <button
                       key={i}
-                      onClick={() => {
-                        setLocalQuery(prompt);
-                      }}
-                      className="text-left px-5 py-3.5 rounded-xl border border-white/5 bg-white/5 hover:border-brand-500/30 hover:bg-brand-500/10 hover:-translate-y-0.5 transition-all duration-300 text-[13px] text-gray-300 flex items-start gap-3 group relative overflow-hidden shadow-sm hover:shadow-md"
+                      onClick={() => setLocalQuery(prompt)}
+                      className="text-left px-5 py-3.5 rounded-xl border border-white/5 bg-white/5 hover:border-brand-500/30 hover:bg-brand-500/10 hover:-translate-y-0.5 transition-all duration-300 text-[13px] text-gray-300 flex items-start gap-3 group relative overflow-hidden shadow-sm hover:shadow-md cursor-pointer"
                     >
                       <div className="absolute inset-0 bg-gradient-to-br from-brand-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
                       <MessageSquare size={14} className="mt-0.5 text-gray-500 group-hover:text-brand-400 transition-colors shrink-0 relative z-10" />
@@ -756,7 +909,7 @@ Supported types:
                       <button
                         key={a}
                         onClick={() => toggleHubSelectedAgent(a as Agent)}
-                        className={`px-3 py-1.5 rounded-full text-[12px] transition-all border ${
+                        className={`px-3 py-1.5 rounded-full text-[12px] transition-all border cursor-pointer ${
                           hubSelectedAgents.includes(a as Agent)
                             ? 'bg-brand-500/20 border-brand-500/50 text-brand-400 font-medium'
                             : 'bg-[var(--color-bg-primary)] border-[var(--color-border-primary)] text-gray-400 hover:border-gray-500 hover:text-gray-300'
@@ -779,15 +932,38 @@ Supported types:
 
                 return (
                   <div className={`relative mt-2 pl-4 py-2 before:absolute before:left-0 before:top-0 before:bottom-0 before:w-[2px] before:rounded-full before:bg-gradient-to-b ${msgAgentTheme.glow} before:to-transparent animate-in fade-in slide-in-from-left-2 duration-500`}>
-                    <div className={`absolute -left-1.5 top-0 w-3 h-3 rounded-full ${msgAgentTheme.iconBg} border border-white/20 shadow-[0_0_10px_rgba(255,255,255,0.1)]`} style={{ boxShadow: `0 0 10px var(--tw-shadow-color)` }}></div>
+                    <div className={`absolute -left-1.5 top-0 w-3 h-3 rounded-full ${msgAgentTheme.iconBg} border border-white/20 shadow-[0_0_10px_rgba(255,255,255,0.1)]`}></div>
+                    
                     <div className="text-[13.5px] text-gray-200 leading-[1.7] tracking-wide">
                       {formatMarkdown(mainText, msgAgentTheme)}
                     </div>
+
+                    {/* Live RAG Citation Source Chips */}
+                    {currentRAGSources.length > 0 && (
+                      <div className="mt-3 pt-2 border-t border-white/5 flex flex-wrap items-center gap-1.5 text-[11px]">
+                        <span className="text-gray-500 flex items-center gap-1 text-[10px] uppercase font-bold tracking-wider mr-1">
+                          <BookOpen size={10} className="text-brand-400" />
+                          RAG Citations:
+                        </span>
+                        {currentRAGSources.map((src, sIdx) => (
+                          <button
+                            key={sIdx}
+                            onClick={() => setRAGModalOpen(true, agent)}
+                            className="px-2 py-0.5 rounded-md bg-white/5 hover:bg-brand-500/15 border border-white/10 hover:border-brand-500/30 text-gray-300 hover:text-brand-300 transition-all cursor-pointer flex items-center gap-1 font-mono text-[10.5px]"
+                            title={`Grounded on: ${src.title} (${src.relevance}% relevance)`}
+                          >
+                            <span className="text-emerald-400 font-bold">{src.relevance}%</span>
+                            <span className="max-w-[130px] truncate">{src.title}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
                     {detailsText && (
                       <div className="mt-4 max-w-full">
                         <button 
                           onClick={() => setExpandedSection(isExpanded ? null : { msgId, idx: 0 })}
-                          className={`group flex items-center justify-between w-full text-[12.5px] font-medium px-4 py-2.5 rounded-xl border ${msgAgentTheme.border} bg-white/5 hover:bg-white/10 transition-all duration-300 backdrop-blur-sm overflow-hidden relative shadow-sm hover:shadow-md`}
+                          className={`group flex items-center justify-between w-full text-[12.5px] font-medium px-4 py-2.5 rounded-xl border ${msgAgentTheme.border} bg-white/5 hover:bg-white/10 transition-all duration-300 backdrop-blur-sm overflow-hidden relative shadow-sm hover:shadow-md cursor-pointer`}
                         >
                           <div className="flex items-center gap-2.5 relative z-10">
                             <div className={`p-1.5 rounded-md ${msgAgentTheme.bg} ${msgAgentTheme.text} shadow-sm group-hover:scale-110 transition-transform duration-300`}>
@@ -797,19 +973,16 @@ Supported types:
                               {isExpanded ? 'Hide Relevant Details' : 'View Relevant Details'}
                             </span>
                           </div>
-                          <div className={`relative z-10 transition-transform duration-500 ease-[cubic-bezier(0.87,_0,_0.13,_1)] ${isExpanded ? 'rotate-180' : ''}`}>
+                          <div className={`relative z-10 transition-transform duration-500 ${isExpanded ? 'rotate-180' : ''}`}>
                             <div className={`w-6 h-6 rounded-full ${msgAgentTheme.iconBg} flex items-center justify-center`}>
                               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={msgAgentTheme.text}><path d="m6 9 6 6 6-6"/></svg>
                             </div>
                           </div>
-                          {/* subtle gradient hover effect */}
-                          <div className={`absolute inset-0 bg-gradient-to-r ${msgAgentTheme.glow} to-transparent opacity-0 group-hover:opacity-[0.15] transition-opacity duration-500`}></div>
                         </button>
                         
-                        <div className={`grid transition-all duration-500 ease-[cubic-bezier(0.87,_0,_0.13,_1)] ${isExpanded ? 'grid-rows-[1fr] opacity-100 mt-2' : 'grid-rows-[0fr] opacity-0'}`}>
+                        <div className={`grid transition-all duration-500 ${isExpanded ? 'grid-rows-[1fr] opacity-100 mt-2' : 'grid-rows-[0fr] opacity-0'}`}>
                           <div className="overflow-hidden">
                             <div className={`p-5 rounded-xl border ${msgAgentTheme.border} bg-black/40 backdrop-blur-xl shadow-inner relative mt-1`}>
-                              <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-white/20 to-transparent"></div>
                               <div className="text-[13.5px] text-gray-300 leading-[1.7]">
                                 {formatMarkdown(detailsText, msgAgentTheme)}
                               </div>
@@ -823,7 +996,6 @@ Supported types:
               };
 
               const regex = new RegExp(`\\*\\*(You|[A-Za-z0-9 -]+):\\*\\*([\\s\\S]*?)(?=(?:\\*\\*(?:You|[A-Za-z0-9 -]+):\\*\\*|$))`, 'g');
-
               const messages: any[] = [];
               let match;
               let idCounter = 0;
@@ -858,11 +1030,35 @@ Supported types:
                         </div>
                       ) : (
                         <div className="w-full animate-in fade-in duration-300">
-                          <div className="flex items-center gap-2 mb-2 px-1">
-                            <div className={`w-7 h-7 rounded-lg ${msgAgentTheme.iconBg} border border-white/10 flex items-center justify-center shadow-sm`}>
-                              <Bot size={16} className={msgAgentTheme.iconText} />
+                          <div className="flex items-center justify-between mb-2 px-1">
+                            <div className="flex items-center gap-2">
+                              <div className={`w-7 h-7 rounded-lg ${msgAgentTheme.iconBg} border border-white/10 flex items-center justify-center shadow-sm`}>
+                                <Bot size={16} className={msgAgentTheme.iconText} />
+                              </div>
+                              <span className={`text-[11px] font-bold ${msgAgentTheme.text} uppercase tracking-wider`}>{msg.senderName}</span>
                             </div>
-                            <span className={`text-[11px] font-bold ${msgAgentTheme.text} uppercase tracking-wider`}>{msg.senderName}</span>
+                            <button
+                              onClick={() => {
+                                const cleanText = msg.text.replace(/===DETAILS===[\s\S]*$/, '').trim();
+                                navigator.clipboard.writeText(cleanText);
+                                setCopiedMsgId(msg.id);
+                                setTimeout(() => setCopiedMsgId(null), 2000);
+                              }}
+                              className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition-all text-[11px] cursor-pointer border border-white/5"
+                              title="Copy response to clipboard"
+                            >
+                              {copiedMsgId === msg.id ? (
+                                <>
+                                  <CheckCircle2 size={11} className="text-emerald-400" />
+                                  <span className="text-emerald-400 text-[10.5px]">Copied</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy size={11} />
+                                  <span className="text-[10.5px]">Copy</span>
+                                </>
+                              )}
+                            </button>
                           </div>
                           {renderAgentResponse(msg.id, msg.text, msgAgentTheme)}
                         </div>
@@ -878,7 +1074,7 @@ Supported types:
                             <Bot size={16} className={agentTheme.iconText} />
                           </div>
                           <span className={`text-[11px] font-bold ${agentTheme.text} uppercase tracking-wider`}>
-                            {agent === 'Multi-Agent Hub' ? 'Agents are typing...' : agent}
+                            {agent === 'Multi-Agent Hub' ? 'Agents are synthesizing with RAG...' : `${agent} is retrieving & typing...`}
                           </span>
                         </div>
                         <div className="flex gap-1.5 py-3.5 px-4 bg-[var(--color-bg-tertiary)] border border-[var(--color-border-primary)] rounded-2xl rounded-tl-sm w-fit items-center shadow-sm">
@@ -896,14 +1092,17 @@ Supported types:
         </div>
 
         {/* Chat Input Area */}
-        <div className="p-4 bg-gradient-to-t from-[var(--color-bg-primary)] via-[var(--color-bg-primary)] to-transparent shrink-0 z-10 w-full relative pt-8">
+        <div className="p-4 bg-gradient-to-t from-[var(--color-bg-primary)] via-[var(--color-bg-primary)] to-transparent shrink-0 z-10 w-full relative pt-6">
           <div className="max-w-4xl mx-auto flex flex-col gap-2 relative">
-            {/* Ambient glow behind input */}
             <div className="absolute inset-0 bg-brand-500/10 blur-xl rounded-full opacity-40 -z-10"></div>
             
             <div className="flex items-end bg-black/40 backdrop-blur-xl rounded-2xl w-full shadow-2xl border border-white/10 focus-within:border-brand-500/40 focus-within:bg-black/60 transition-all duration-300 overflow-hidden group">
-              <button className="text-gray-400 hover:text-gray-200 transition-colors flex-shrink-0 p-3 ml-1" title="Attach file">
-                <Plus size={18} strokeWidth={2} />
+              <button 
+                onClick={() => setRAGModalOpen(true, agent)}
+                className="text-gray-400 hover:text-brand-400 transition-colors flex-shrink-0 p-3 ml-1 cursor-pointer" 
+                title="Open RAG Knowledge Base"
+              >
+                <BrainCircuit size={18} strokeWidth={2} />
               </button>
 
               <textarea
@@ -915,7 +1114,7 @@ Supported types:
                     if (localQuery.trim()) handleRunAgent(e as any);
                   }
                 }}
-                placeholder={isRunning ? "Agent is typing..." : `Message ${agent}...`}
+                placeholder={isRunning ? "Agent is retrieving RAG context & reasoning..." : `Ask ${agent} (Grounded with RAG)...`}
                 disabled={isRunning}
                 rows={1}
                 className="flex-1 bg-transparent text-[13.5px] text-gray-200 outline-none placeholder-gray-500 disabled:opacity-50 py-3.5 resize-none max-h-32 min-h-[50px] custom-scrollbar"
@@ -931,22 +1130,28 @@ Supported types:
               <button
                 onClick={handleRunAgent}
                 disabled={isRunning || !localQuery.trim()}
-                className={`p-2.5 m-1.5 rounded-xl flex items-center justify-center transition-all duration-300 flex-shrink-0 ${
+                className={`p-2.5 m-1.5 rounded-xl flex items-center justify-center transition-all duration-300 flex-shrink-0 cursor-pointer ${
                   isRunning ? 'bg-brand-500/20 text-brand-500' : 
                   !localQuery.trim() ? 'bg-white/5 text-gray-500 cursor-not-allowed' :
                   'bg-brand-500 hover:bg-brand-400 hover:shadow-lg hover:shadow-brand-500/25 hover:-translate-y-0.5 text-white shadow-sm'
                 }`}
-                title="Send message"
+                title="Send grounded query"
               >
                 {isRunning ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} className="ml-0.5" />}
               </button>
             </div>
-            <div className="text-center text-[10px] text-gray-500">
-              AI can make mistakes. Verify important information.
+            
+            <div className="flex items-center justify-between text-[10.5px] text-gray-500 px-2">
+              <span className="flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" />
+                RAG Engine: Hybrid Dense Vector + BM25 Lexical
+              </span>
+              <span>AI can make mistakes. Verify important information.</span>
             </div>
           </div>
         </div>
       </div>
+
       {/* Save Popup */}
       {showSavePopup && (
         <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-brand-600 text-white px-4 py-2 rounded-md shadow-lg flex items-center gap-2 z-50 animate-in fade-in slide-in-from-bottom-4 duration-300">
@@ -966,7 +1171,7 @@ Supported types:
               <h3 className="text-lg font-medium text-white flex items-center gap-2">
                 <History size={18} className="text-brand-400" /> Past Conversations
               </h3>
-              <button onClick={(e) => { e.stopPropagation(); setShowHistoryModal(false); }} className="text-gray-400 hover:text-white transition-colors">
+              <button onClick={(e) => { e.stopPropagation(); setShowHistoryModal(false); }} className="text-gray-400 hover:text-white transition-colors cursor-pointer">
                 <X size={18} />
               </button>
             </div>
@@ -989,7 +1194,7 @@ Supported types:
                       </div>
                       <button 
                         onClick={(e) => { e.stopPropagation(); deletePastConversation(convo.id); }}
-                        className="absolute right-3 p-1.5 text-gray-500 hover:text-red-400 hover:bg-red-500/10 rounded-md opacity-0 group-hover:opacity-100 transition-all"
+                        className="absolute right-3 p-1.5 text-gray-500 hover:text-red-400 hover:bg-red-500/10 rounded-md opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
                         title="Delete Conversation"
                       >
                         <Trash2 size={14} />
@@ -1003,7 +1208,7 @@ Supported types:
             <div className="flex justify-end pt-2 border-t border-[var(--color-border-primary)]">
               <button
                 onClick={(e) => { e.stopPropagation(); setShowHistoryModal(false); }}
-                className="px-4 py-2 text-sm text-gray-300 hover:text-white transition-colors"
+                className="px-4 py-2 text-sm text-gray-300 hover:text-white transition-colors cursor-pointer"
               >
                 Close
               </button>

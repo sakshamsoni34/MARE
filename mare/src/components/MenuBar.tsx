@@ -135,10 +135,10 @@ export default function MenuBar({ onNewFile, onNewFolder, showProfile = false, s
     }
   };
 
-  const dropdownVariants = {
+  const dropdownVariants: any = {
     hidden: { opacity: 0, y: -5, scale: 0.95 },
-    visible: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.15, ease: "easeOut" } },
-    exit: { opacity: 0, y: -5, scale: 0.95, transition: { duration: 0.1, ease: "easeIn" } }
+    visible: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.15 } },
+    exit: { opacity: 0, y: -5, scale: 0.95, transition: { duration: 0.1 } }
   };
 
   const renderNavDropdown = () => {
@@ -196,6 +196,8 @@ export default function MenuBar({ onNewFile, onNewFolder, showProfile = false, s
     if (activeMenu === 'View') {
       return (
         <DropdownWrapper left={120}><div className="w-72">
+          <MenuItem label="Open RAG Knowledge Base" onClick={() => useStore.getState().setRAGModalOpen(true, 'all')} />
+          <MenuItem divider />
           <MenuItem label="Toggle Explorer Sidebar" onClick={toggleSidebar} />
           <MenuItem label="Toggle Orqion Chat" onClick={toggleRightSidebar} />
           <MenuItem label="Toggle Terminal Panel" shortcut="Ctrl+`" onClick={toggleTerminal} />

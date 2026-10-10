@@ -2,11 +2,12 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Play, Bell, Search, Activity, Cpu, Network, ChevronDown } from 'lucide-react';
+import { Play, Bell, Search, Activity, Cpu, Network, ChevronDown, BrainCircuit, Database } from 'lucide-react';
 import Explorer from '@/components/Explorer';
 import TerminalOutput from '@/components/TerminalOutput';
 import CodeEditor from '@/components/CodeEditor';
 import ChatInterface from '@/components/ChatInterface';
+import RAGKnowledgeModal from '@/components/RAGKnowledgeModal';
 import dynamic from 'next/dynamic';
 
 const WorkflowVisualizer = dynamic(() => import('@/components/WorkflowVisualizer'), {
@@ -20,7 +21,31 @@ import { useStore } from '@/store/useStore';
 
 export default function Dashboard() {
   const router = useRouter();
-  const { runningAgents, setAgentRunning, addTerminalLog, updateLastTerminalLog, clearTerminalLogs, isTerminalOpen, isSidebarOpen, isRightSidebarOpen, activeAgent, setActiveAgent, openAgents, addOpenAgent, editorCode, updateAgentScript, isWorkflowOpen, toggleWorkflow, userQuery, setUserQuery, selectedFolderId, activeProject } = useStore();
+  const { 
+    runningAgents, 
+    setAgentRunning, 
+    addTerminalLog, 
+    updateLastTerminalLog, 
+    clearTerminalLogs, 
+    isTerminalOpen, 
+    isSidebarOpen, 
+    isRightSidebarOpen, 
+    activeAgent, 
+    setActiveAgent, 
+    openAgents, 
+    addOpenAgent, 
+    editorCode, 
+    updateAgentScript, 
+    isWorkflowOpen, 
+    toggleWorkflow, 
+    userQuery, 
+    setUserQuery, 
+    selectedFolderId, 
+    activeProject,
+    setRAGModalOpen,
+    setAgentRAGSources
+  } = useStore();
+
   const [workflowWidth, setWorkflowWidth] = useState(500);
   const [isAgentDropdownOpen, setIsAgentDropdownOpen] = useState(false);
   const [agentWidths, setAgentWidths] = useState<Record<string, number>>({});
@@ -46,11 +71,15 @@ export default function Dashboard() {
       if (e.ctrlKey && (e.key === '`' || e.key === '~' || e.code === 'Backquote')) {
         e.preventDefault();
         useStore.getState().toggleTerminal();
+      } else if (e.ctrlKey && (e.key === 'k' || e.key === 'K') && !e.shiftKey) {
+        // shortcut to open RAG modal
+        e.preventDefault();
+        setRAGModalOpen(true, 'all');
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [setRAGModalOpen]);
 
   const handleStartResearch = async () => {
     const agentsToRun = openAgents.filter(agent => !runningAgents[agent] && agent !== 'Orqion');
@@ -60,7 +89,7 @@ export default function Dashboard() {
 
     const runPromises = agentsToRun.map(async (agentToRun) => {
       setAgentRunning(agentToRun, true);
-      addTerminalLog(`> Status: <span class="text-accent-yellow">INITIALIZING ${agentToRun.toUpperCase()}...</span>`);
+      addTerminalLog(`> Status: <span class="text-accent-yellow">INITIALIZING ${agentToRun.toUpperCase()} (RAG GROUNDING ACTIVE)...</span>`);
 
       try {
         const response = await fetch('http://localhost:8555/api/agent', {
@@ -82,13 +111,13 @@ export default function Dashboard() {
           return;
         }
 
-        addTerminalLog(`> <span class="text-accent-green">${agentToRun} connected. Task is executing...</span>`);
+        addTerminalLog(`> <span class="text-accent-green">${agentToRun} connected & RAG grounded. Task is executing...</span>`);
 
         const reader = response.body?.getReader();
         const decoder = new TextDecoder();
 
         let currentScriptCode = useStore.getState().agentScripts[agentToRun] || '';
-        currentScriptCode += `\n\n# --- ${agentToRun} Response ---\n\n`;
+        currentScriptCode += `\n\n# --- ${agentToRun} Grounded Response ---\n\n`;
         useStore.getState().updateAgentScript(agentToRun, currentScriptCode);
         
         let lastUpdate = Date.now();
@@ -106,6 +135,9 @@ export default function Dashboard() {
 
                 try {
                   const parsed = JSON.parse(dataStr);
+                  if (parsed.rag_sources) {
+                    setAgentRAGSources(agentToRun, parsed.rag_sources);
+                  }
                   const content = parsed.choices?.[0]?.delta?.content;
                   if (content) {
                     currentScriptCode += content;
@@ -141,7 +173,7 @@ export default function Dashboard() {
           } catch (e) { }
         }
 
-        addTerminalLog(`> Status: <span class="text-accent-green">${agentToRun.toUpperCase()} TASK COMPLETED</span>`);
+        addTerminalLog(`> Status: <span class="text-accent-green">${agentToRun.toUpperCase()} TASK COMPLETED & GROUNDED</span>`);
       } catch (error: any) {
         addTerminalLog(`> <span class="text-accent-red">Error (${agentToRun}):</span> ${error.message}`);
       } finally {
@@ -170,7 +202,16 @@ export default function Dashboard() {
                 <div className="flex-1 overflow-x-auto overflow-y-hidden flex pb-2 custom-scrollbar">
                   {openAgents.length === 0 ? (
                     <div className="flex-1 flex flex-col items-center justify-center h-full w-full select-none">
-                      <img src="/logo.png?v=2" alt="MRE Logo" className="w-[500px] max-w-[80%] pointer-events-none" />
+                      <img src="/logo.png?v=2" alt="MARE Logo" className="w-[500px] max-w-[80%] pointer-events-none" />
+                      <div className="flex items-center gap-3 mt-4">
+                        <button
+                          onClick={() => setRAGModalOpen(true, 'all')}
+                          className="px-4 py-2 rounded-xl text-xs font-medium bg-brand-500/10 text-brand-300 border border-brand-500/30 hover:bg-brand-500/20 transition-all flex items-center gap-2 cursor-pointer shadow-sm"
+                        >
+                          <Database size={14} />
+                          <span>Explore RAG Knowledge Base</span>
+                        </button>
+                      </div>
                     </div>
                   ) : (
                     openAgents.map((agent, index) => (
@@ -251,12 +292,26 @@ export default function Dashboard() {
       </div>
 
       {/* Bottom Status Bar */}
-      <footer className="flex h-8 shrink-0 items-center justify-between border-t border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] px-4 text-xs font-medium text-text-tertiary w-full">
+      <footer className="flex h-8 shrink-0 items-center justify-between border-t border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] px-4 text-xs font-medium text-text-tertiary w-full z-40">
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-2">
             <span>Tokens Used:</span>
             <span className="text-white bg-[var(--color-bg-tertiary)] px-2 py-0.5 rounded font-mono">2.45M</span>
           </div>
+          
+          <button
+            onClick={() => setRAGModalOpen(true, 'all')}
+            className="flex items-center gap-2 hover:text-white transition-colors cursor-pointer"
+            title="Open RAG Knowledge Hub"
+          >
+            <Database size={13} className="text-brand-400" />
+            <span>RAG Engine:</span>
+            <span className="text-emerald-400 font-mono flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              Active Grounding
+            </span>
+          </button>
+
           <div className="flex items-center gap-2">
             <span>System Health:</span>
             <span className="text-accent-green flex items-center gap-1">
@@ -279,6 +334,9 @@ export default function Dashboard() {
           </div>
         </div>
       </footer>
+
+      {/* Global RAG Knowledge Base Modal */}
+      <RAGKnowledgeModal />
     </div>
   );
 }

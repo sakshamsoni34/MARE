@@ -36,3 +36,21 @@ class SyncAgentStateRequest(BaseModel):
     agent_name: str
     script_code: str
 
+class RAGIngestRequest(BaseModel):
+    title: str
+    content: str
+    source: Optional[str] = "knowledge_base"
+    category: Optional[str] = "documentation"
+    agent_target: Optional[str] = "all"
+    metadata: Optional[Dict[str, Any]] = None
+
+class RAGQueryRequest(BaseModel):
+    query: str
+    agent_name: Optional[str] = "all"
+    top_k: Optional[int] = 4
+    category: Optional[str] = None
+
+class RAGReindexRequest(BaseModel):
+    include_workspace_files: Optional[bool] = True
+
+

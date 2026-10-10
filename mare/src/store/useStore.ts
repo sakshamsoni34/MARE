@@ -1,8 +1,35 @@
 import { create } from 'zustand';
-
 import { Node, Edge } from '@xyflow/react';
 
-export type Agent = 'Multi-Agent Hub' | 'Researcher Agent' | 'Coder Agent' | 'Planner Agent' | 'Executor Agent' | 'Reviewer Agent' | 'Designer Agent' | 'Tester Agent' | 'Task Decomposer Agent' | 'Goal Manager Agent' | 'Web Search Agent' | 'Academic Research Agent' | 'Browser Agent' | 'News Agent' | 'Code Agent' | 'Python Agent' | 'Automation Agent' | 'Data Analysis Agent' | 'Visualization Agent' | 'Validation Agent' | 'Report Generator Agent' | 'Presentation Agent' | 'Export Agent' | 'Live Workflow Agent' | 'Agent Communication Agent' | 'Logs Agent' | 'Events Agent' | 'Orqion';
+export type Agent = 
+  | 'Multi-Agent Hub' 
+  | 'Researcher Agent' 
+  | 'Coder Agent' 
+  | 'Planner Agent' 
+  | 'Executor Agent' 
+  | 'Reviewer Agent' 
+  | 'Designer Agent' 
+  | 'Tester Agent' 
+  | 'Task Decomposer Agent' 
+  | 'Goal Manager Agent' 
+  | 'Web Search Agent' 
+  | 'Academic Research Agent' 
+  | 'Browser Agent' 
+  | 'News Agent' 
+  | 'Code Agent' 
+  | 'Python Agent' 
+  | 'Automation Agent' 
+  | 'Data Analysis Agent' 
+  | 'Visualization Agent' 
+  | 'Validation Agent' 
+  | 'Report Generator Agent' 
+  | 'Presentation Agent' 
+  | 'Export Agent' 
+  | 'Live Workflow Agent' 
+  | 'Agent Communication Agent' 
+  | 'Logs Agent' 
+  | 'Events Agent' 
+  | 'Orqion';
 
 export interface PastConversation {
   id: string;
@@ -10,6 +37,14 @@ export interface PastConversation {
   title: string;
   content: string;
   timestamp: string;
+}
+
+export interface RAGSourceItem {
+  title: string;
+  source: string;
+  agent_target?: string;
+  relevance: number;
+  snippet: string;
 }
 
 export type FileSystemNode = {
@@ -46,9 +81,24 @@ interface StoreState {
   pastConversations: PastConversation[];
   hubSelectedAgents: Agent[];
 
+  // RAG Knowledge Base State
+  isRAGModalOpen: boolean;
+  ragFilterAgent: string;
+  ragStats: {
+    total_documents: number;
+    total_chunks: number;
+    sources_count: number;
+    embedding_engine: string;
+    status: string;
+  } | null;
+  agentRAGSources: Record<string, RAGSourceItem[]>;
+
   // Actions
   setActiveProject: (project: string) => void;
   setSignInModalOpen: (isOpen: boolean) => void;
+  setRAGModalOpen: (isOpen: boolean, filterAgent?: string) => void;
+  setRAGStats: (stats: any) => void;
+  setAgentRAGSources: (agent: string, sources: RAGSourceItem[]) => void;
   setActiveAgent: (agent: Agent) => void;
   addOpenAgent: (agent: Agent) => void;
   removeOpenAgent: (agent: Agent) => void;
@@ -116,9 +166,18 @@ export const useStore = create<StoreState>()(
       isSignInModalOpen: false,
       pastConversations: [],
       hubSelectedAgents: ['Planner Agent', 'Reviewer Agent'],
+      isRAGModalOpen: false,
+      ragFilterAgent: 'all',
+      ragStats: null,
+      agentRAGSources: {},
 
       setActiveProject: (project) => set({ activeProject: project }),
       setSignInModalOpen: (isOpen) => set({ isSignInModalOpen: isOpen }),
+      setRAGModalOpen: (isOpen, filterAgent = 'all') => set({ isRAGModalOpen: isOpen, ragFilterAgent: filterAgent || 'all' }),
+      setRAGStats: (stats) => set({ ragStats: stats }),
+      setAgentRAGSources: (agent, sources) => set((state) => ({
+        agentRAGSources: { ...state.agentRAGSources, [agent]: sources }
+      })),
       setActiveAgent: (agent) => set((state) => {
         if (state.activeAgent === agent) return state;
         const currentAgent = state.activeAgent || 'Researcher Agent';
@@ -380,7 +439,6 @@ export const useStore = create<StoreState>()(
           return nodes.map(node => {
             if (node.id === id) {
               const currentAgentContents = node.agentContents || {};
-              // Migrate legacy content if needed
               if (node.content && node.agentName && Object.keys(currentAgentContents).length === 0) {
                 currentAgentContents[node.agentName] = node.content;
               }
@@ -388,7 +446,7 @@ export const useStore = create<StoreState>()(
 
               return {
                 ...node,
-                content, // keep legacy field just in case
+                content,
                 agentName: targetAgent,
                 agentContents: {
                   ...currentAgentContents,
