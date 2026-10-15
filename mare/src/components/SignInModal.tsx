@@ -1,19 +1,11 @@
 import { useStore } from '@/store/useStore';
-import { X, Smartphone } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { X } from 'lucide-react';
 import { signIn } from 'next-auth/react';
 
 export default function SignInModal() {
-  const { isSignInModalOpen, setSignInModalOpen, setActiveProject, updateAgentScript } = useStore();
-  const router = useRouter();
+  const { isSignInModalOpen, setSignInModalOpen, updateAgentScript } = useStore();
 
   if (!isSignInModalOpen) return null;
-
-  const handleSignIn = () => {
-    setSignInModalOpen(false);
-    updateAgentScript('Orqion', '');
-    // Remove auto-assignment and routing, keeping them on the page to select folder
-  };
 
   const handleGoogleSignIn = () => {
     updateAgentScript('Orqion', '');
@@ -35,10 +27,10 @@ export default function SignInModal() {
           <p className="mt-2 text-sm text-text-secondary">Sign in to your account to continue</p>
         </div>
 
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-3">
           <button
             onClick={handleGoogleSignIn}
-            className="flex w-full items-center justify-center gap-3 rounded-lg border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-[var(--color-bg-tertiary)]"
+            className="flex w-full items-center justify-center gap-3 rounded-lg border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-[var(--color-bg-tertiary)] cursor-pointer"
           >
             <svg className="h-5 w-5" viewBox="0 0 24 24">
               <path

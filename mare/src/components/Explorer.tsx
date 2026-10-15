@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import {
   FilePlus,
   FolderPlus,
@@ -8,13 +10,17 @@ import {
   ChevronDown,
   File,
   Folder,
+  FolderOpen,
   Edit2,
   Trash2,
   Code
 } from 'lucide-react';
 import { useStore, FileSystemNode } from '@/store/useStore';
+import { openWorkspaceFolder } from '@/lib/workspace';
 
 export default function Explorer() {
+  const router = useRouter();
+  const { status } = useSession();
   const { fileSystem, createFile, createFolder, toggleFolder, expandFolder, collapseAllFolders, renameNode, deleteNode, selectedFolderId, setSelectedFolderId, activeProject, setEditorCode, addOpenAgent, updateAgentScript } = useStore();
   const [contextMenuInfo, setContextMenuInfo] = useState<{ x: number, y: number, nodeId: string } | null>(null);
   const [creatingItem, setCreatingItem] = useState<{ type: 'file' | 'folder', parentId: string | null } | null>(null);
@@ -230,20 +236,38 @@ export default function Explorer() {
             {activeProject ? activeProject : 'NO FOLDER OPEN'}
           </span>
         </div>
-        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button onClick={handleNewFile} className="p-1 hover:bg-[#3c3c3c] rounded text-text-tertiary hover:text-text-primary transition-colors" title="New File">
-            <FilePlus size={15} />
+        {!activeProject && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              openWorkspaceFolder({
+                status,
+                onRequireAuth: () => useStore.getState().setSignInModalOpen(true),
+                onSuccess: () => router.push('/dashboard')
+              });
+            }}
+            className="p-1 hover:bg-[#3c3c3c] rounded text-text-tertiary hover:text-brand-300 transition-colors"
+            title="Open Folder"
+          >
+            <FolderOpen size={14} />
           </button>
-          <button onClick={handleNewFolder} className="p-1 hover:bg-[#3c3c3c] rounded text-text-tertiary hover:text-text-primary transition-colors" title="New Folder">
-            <FolderPlus size={15} />
-          </button>
-          <button onClick={handleRefresh} className="p-1 hover:bg-[#3c3c3c] rounded text-text-tertiary hover:text-text-primary transition-colors" title="Refresh">
-            <RefreshCw size={15} />
-          </button>
-          <button onClick={handleCollapseAll} className="p-1 hover:bg-[#3c3c3c] rounded text-text-tertiary hover:text-text-primary transition-colors" title="Collapse Folders">
-            <ListCollapse size={15} />
-          </button>
-        </div>
+        )}
+        {activeProject && (
+          <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button onClick={handleNewFile} className="p-1 hover:bg-[#3c3c3c] rounded text-text-tertiary hover:text-text-primary transition-colors" title="New File">
+              <FilePlus size={15} />
+            </button>
+            <button onClick={handleNewFolder} className="p-1 hover:bg-[#3c3c3c] rounded text-text-tertiary hover:text-text-primary transition-colors" title="New Folder">
+              <FolderPlus size={15} />
+            </button>
+            <button onClick={handleRefresh} className="p-1 hover:bg-[#3c3c3c] rounded text-text-tertiary hover:text-text-primary transition-colors" title="Refresh">
+              <RefreshCw size={15} />
+            </button>
+            <button onClick={handleCollapseAll} className="p-1 hover:bg-[#3c3c3c] rounded text-text-tertiary hover:text-text-primary transition-colors" title="Collapse Folders">
+              <ListCollapse size={15} />
+            </button>
+          </div>
+        )}
       </div>
 
       {isExplorerExpanded && (
@@ -256,8 +280,16 @@ export default function Explorer() {
             }
           }}
         >
-          {renderInput(null, 0)}
-          {fileSystem.map(node => renderNode(node, 0))}
+          {activeProject ? (
+            <>
+              {renderInput(null, 0)}
+              {fileSystem.length === 0 ? (
+                <div className="p-4 text-xs text-text-tertiary text-center">Empty folder</div>
+              ) : (
+                fileSystem.map(node => renderNode(node, 0))
+              )}
+            </>
+          ) : null}
         </div>
       )}
 

@@ -39,14 +39,6 @@ export interface PastConversation {
   timestamp: string;
 }
 
-export interface RAGSourceItem {
-  title: string;
-  source: string;
-  agent_target?: string;
-  relevance: number;
-  snippet: string;
-}
-
 export type FileSystemNode = {
   id: string;
   name: string;
@@ -81,24 +73,9 @@ interface StoreState {
   pastConversations: PastConversation[];
   hubSelectedAgents: Agent[];
 
-  // RAG Knowledge Base State
-  isRAGModalOpen: boolean;
-  ragFilterAgent: string;
-  ragStats: {
-    total_documents: number;
-    total_chunks: number;
-    sources_count: number;
-    embedding_engine: string;
-    status: string;
-  } | null;
-  agentRAGSources: Record<string, RAGSourceItem[]>;
-
   // Actions
   setActiveProject: (project: string) => void;
   setSignInModalOpen: (isOpen: boolean) => void;
-  setRAGModalOpen: (isOpen: boolean, filterAgent?: string) => void;
-  setRAGStats: (stats: any) => void;
-  setAgentRAGSources: (agent: string, sources: RAGSourceItem[]) => void;
   setActiveAgent: (agent: Agent) => void;
   addOpenAgent: (agent: Agent) => void;
   removeOpenAgent: (agent: Agent) => void;
@@ -166,18 +143,9 @@ export const useStore = create<StoreState>()(
       isSignInModalOpen: false,
       pastConversations: [],
       hubSelectedAgents: ['Planner Agent', 'Reviewer Agent'],
-      isRAGModalOpen: false,
-      ragFilterAgent: 'all',
-      ragStats: null,
-      agentRAGSources: {},
 
       setActiveProject: (project) => set({ activeProject: project }),
       setSignInModalOpen: (isOpen) => set({ isSignInModalOpen: isOpen }),
-      setRAGModalOpen: (isOpen, filterAgent = 'all') => set({ isRAGModalOpen: isOpen, ragFilterAgent: filterAgent || 'all' }),
-      setRAGStats: (stats) => set({ ragStats: stats }),
-      setAgentRAGSources: (agent, sources) => set((state) => ({
-        agentRAGSources: { ...state.agentRAGSources, [agent]: sources }
-      })),
       setActiveAgent: (agent) => set((state) => {
         if (state.activeAgent === agent) return state;
         const currentAgent = state.activeAgent || 'Researcher Agent';

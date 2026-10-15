@@ -36,21 +36,19 @@ class SyncAgentStateRequest(BaseModel):
     agent_name: str
     script_code: str
 
-class RAGIngestRequest(BaseModel):
-    title: str
-    content: str
-    source: Optional[str] = "knowledge_base"
-    category: Optional[str] = "documentation"
-    agent_target: Optional[str] = "all"
-    metadata: Optional[Dict[str, Any]] = None
+class ExecuteCodeRequest(BaseModel):
+    code: str
+    language: Optional[str] = "python"
+    timeout: Optional[int] = 10
 
-class RAGQueryRequest(BaseModel):
-    query: str
-    agent_name: Optional[str] = "all"
-    top_k: Optional[int] = 4
-    category: Optional[str] = None
+class ProjectCreateRequest(BaseModel):
+    name: str
+    description: Optional[str] = ""
+    goal: Optional[str] = ""
+    source: Optional[str] = "user"
+    priority: Optional[str] = "high"
 
-class RAGReindexRequest(BaseModel):
-    include_workspace_files: Optional[bool] = True
-
-
+class WorkflowExecuteRequest(BaseModel):
+    nodes: List[Any]
+    edges: List[Any]
+    project_name: Optional[str] = "default"

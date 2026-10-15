@@ -16,9 +16,7 @@ import {
   History, 
   MoreHorizontal,
   BrainCircuit,
-  Database,
   Sparkles,
-  BookOpen,
   Layers,
   CheckCircle2,
   ExternalLink,
@@ -34,7 +32,7 @@ interface ChatInterfaceProps {
 const AGENT_CONFIGS: Record<string, { description: string, prompts: string[] }> = {
   'Researcher Agent': {
     description: "I gather, analyze, and synthesize information grounded in peer-reviewed science and technical documentation.",
-    prompts: ["Find latest research on Multi-Agent RAG", "Summarize the architecture", "Find sources for our design", "Extract key empirical data points"]
+    prompts: ["Find latest research on AI Agent Workflows", "Summarize the architecture", "Find sources for our design", "Extract key empirical data points"]
   },
   'Planner Agent': {
     description: "I structure projects, break down goals via CPM/WBS, and create resilient roadmaps.",
@@ -70,7 +68,7 @@ const AGENT_CONFIGS: Record<string, { description: string, prompts: string[] }> 
   },
   'Academic Research Agent': {
     description: "I search academic databases, analyze experimental methodologies, and format APA/IEEE citations.",
-    prompts: ["Find arXiv papers on RAG architectures", "Summarize paper methodology and limitations", "Format IEEE citations", "Compare contrasting study conclusions"]
+    prompts: ["Find arXiv papers on LLM Architectures", "Summarize paper methodology and limitations", "Format IEEE citations", "Compare contrasting study conclusions"]
   },
   'Browser Agent': {
     description: "I extract structured data, parse DOM trees, and scrape web content with zero noise.",
@@ -133,8 +131,8 @@ const AGENT_CONFIGS: Record<string, { description: string, prompts: string[] }> 
     prompts: ["List active event subscriptions", "Emit workflow completion event", "Schedule periodic trigger", "Monitor event stream"]
   },
   'Orqion': {
-    description: "I am your autonomous general-purpose AI workspace assistant, grounded in project files and RAG memory.",
-    prompts: ["Create a new file in workspace", "How is our multi-agent RAG structured?", "Write an async Python module", "Coordinate a research workflow"]
+    description: "I am your autonomous general-purpose AI workspace assistant.",
+    prompts: ["Create a new file in workspace", "How is our multi-agent system structured?", "Write an async Python module", "Coordinate a research workflow"]
   },
   'Multi-Agent Hub': {
     description: "Collaborative multi-agent hub. Coordinate cross-agent context chaining and consensus pipelines.",
@@ -383,10 +381,7 @@ export default function ChatInterface({ agent }: ChatInterfaceProps) {
     loadPastConversation, 
     deletePastConversation, 
     hubSelectedAgents, 
-    toggleHubSelectedAgent,
-    setRAGModalOpen,
-    agentRAGSources,
-    setAgentRAGSources
+    toggleHubSelectedAgent
   } = useStore();
 
   const [showHistoryModal, setShowHistoryModal] = useState(false);
@@ -408,8 +403,6 @@ export default function ChatInterface({ agent }: ChatInterfaceProps) {
     displayCode = code.substring(initialText.length).trimStart();
   }
   const hasMessages = !isInitialState && !!displayCode;
-
-  const currentRAGSources = agentRAGSources[agent] || [];
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -444,7 +437,7 @@ export default function ChatInterface({ agent }: ChatInterfaceProps) {
     if (isRunning) return;
 
     setAgentRunning(agent, true);
-    addTerminalLog(`> Status: <span class="text-accent-yellow">INITIALIZING ${agent.toUpperCase()} (RAG RETRIEVAL ACTIVE)...</span>`);
+    addTerminalLog(`> Status: <span class="text-accent-yellow">INITIALIZING ${agent.toUpperCase()}...</span>`);
 
     try {
       const autoWorkflowPrompt = `\n[UI WORKFLOW]\nTo show a workflow/diagram, output exact JSON inside a markdown block:\n\`\`\`json\n{\n  "workflow": {\n    "nodes": [\n      { "id": "1", "position": { "x": 100, "y": 100 }, "data": { "label": "Node 1" }, "type": "default" }\n    ],\n    "edges": [\n      { "id": "e1-2", "source": "1", "target": "2", "animated": true }\n    ]\n  }\n}\n\`\`\`\n`;
@@ -467,7 +460,7 @@ export default function ChatInterface({ agent }: ChatInterfaceProps) {
          for (const subAgent of hubSelectedAgents) {
             currentScriptCode += `\n**${subAgent}:**\n\n`;
             updateAgentScript(agent, currentScriptCode);
-            addTerminalLog(`> Status: <span class="text-accent-yellow">HUB: Executing ${subAgent} with RAG context...</span>`);
+            addTerminalLog(`> Status: <span class="text-accent-yellow">HUB: Executing ${subAgent}...</span>`);
 
             const hubSystemPrompt = (AGENT_CONFIGS[subAgent]?.description || 'You are a helpful AI.') + autoWorkflowPrompt + `\n\n[CONTEXT FROM PREVIOUS AGENTS]\n${accumulatedContext}\nPlease build upon the previous responses to accomplish the user's request.`;
             
@@ -503,10 +496,6 @@ export default function ChatInterface({ agent }: ChatInterfaceProps) {
                     if (dataStr === '[DONE]') continue;
                     try {
                       const parsed = JSON.parse(dataStr);
-                      if (parsed.rag_sources) {
-                        setAgentRAGSources(subAgent, parsed.rag_sources);
-                        setAgentRAGSources(agent, parsed.rag_sources);
-                      }
                       const content = parsed.choices?.[0]?.delta?.content;
                       if (content) {
                         currentScriptCode += content;
@@ -546,7 +535,7 @@ export default function ChatInterface({ agent }: ChatInterfaceProps) {
         return;
       }
 
-      addTerminalLog(`> <span class="text-accent-green">${agent} connected & RAG grounded. Task executing...</span>`);
+      addTerminalLog(`> <span class="text-accent-green">${agent} connected. Task executing...</span>`);
 
       const reader = response.body?.getReader();
       const decoder = new TextDecoder();
@@ -571,9 +560,6 @@ export default function ChatInterface({ agent }: ChatInterfaceProps) {
 
               try {
                 const parsed = JSON.parse(dataStr);
-                if (parsed.rag_sources) {
-                  setAgentRAGSources(agent, parsed.rag_sources);
-                }
                 const content = parsed.choices?.[0]?.delta?.content;
                 if (content) {
                   currentScriptCode += content;
@@ -785,31 +771,13 @@ export default function ChatInterface({ agent }: ChatInterfaceProps) {
         <div className="flex items-center gap-2.5">
           <span className="font-semibold text-[14px] text-blue-400">{agent === 'Orqion' ? 'Orqion' : agent}</span>
           
-          {/* RAG Active Indicator Pill */}
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setRAGModalOpen(true, agent);
-            }}
-            className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/25 hover:bg-emerald-500/20 transition-all cursor-pointer shadow-sm group"
-            title="Click to inspect RAG Knowledge Base & retrieved grounding chunks"
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse group-hover:scale-125 transition-transform" />
-            <span className="font-mono">RAG Grounded</span>
-          </button>
+          <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/25">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="font-mono">MARE</span>
+          </span>
         </div>
 
         <div className="flex items-center gap-4 text-gray-400">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setRAGModalOpen(true, agent);
-            }}
-            className="flex items-center justify-center hover:text-brand-400 transition-colors cursor-pointer"
-            title="Inspect RAG Knowledge Base for this agent"
-          >
-            <BrainCircuit size={17} strokeWidth={2} className="text-brand-400/80 hover:text-brand-300" />
-          </button>
 
           <button
             onClick={handleSave}
@@ -871,19 +839,9 @@ export default function ChatInterface({ agent }: ChatInterfaceProps) {
                 <Bot size={28} className="text-brand-400" />
               </div>
               <h1 className="text-2xl font-semibold text-white tracking-tight mb-2">{agent}</h1>
-              <p className="text-gray-400 text-center max-w-md mb-6 text-[13.5px] leading-relaxed">
+              <p className="text-gray-400 text-center max-w-md mb-8 text-[13.5px] leading-relaxed">
                 {AGENT_CONFIGS[agent]?.description || "How can I assist you with your tasks today?"}
               </p>
-
-              {/* RAG Status Callout Banner */}
-              <div 
-                onClick={() => setRAGModalOpen(true, agent)}
-                className="mb-8 px-4 py-2.5 rounded-xl border border-emerald-500/20 bg-emerald-500/5 hover:bg-emerald-500/10 transition-all cursor-pointer flex items-center gap-2.5 text-xs text-emerald-300 shadow-sm"
-              >
-                <BrainCircuit size={15} className="text-emerald-400 shrink-0" />
-                <span>RAG Retrieval Active: Grounded on project files and domain knowledge.</span>
-                <span className="text-[10px] text-emerald-400 font-mono underline ml-1">Inspect &rarr;</span>
-              </div>
 
               {AGENT_CONFIGS[agent]?.prompts && agent !== 'Multi-Agent Hub' && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full">
@@ -937,27 +895,6 @@ export default function ChatInterface({ agent }: ChatInterfaceProps) {
                     <div className="text-[13.5px] text-gray-200 leading-[1.7] tracking-wide">
                       {formatMarkdown(mainText, msgAgentTheme)}
                     </div>
-
-                    {/* Live RAG Citation Source Chips */}
-                    {currentRAGSources.length > 0 && (
-                      <div className="mt-3 pt-2 border-t border-white/5 flex flex-wrap items-center gap-1.5 text-[11px]">
-                        <span className="text-gray-500 flex items-center gap-1 text-[10px] uppercase font-bold tracking-wider mr-1">
-                          <BookOpen size={10} className="text-brand-400" />
-                          RAG Citations:
-                        </span>
-                        {currentRAGSources.map((src, sIdx) => (
-                          <button
-                            key={sIdx}
-                            onClick={() => setRAGModalOpen(true, agent)}
-                            className="px-2 py-0.5 rounded-md bg-white/5 hover:bg-brand-500/15 border border-white/10 hover:border-brand-500/30 text-gray-300 hover:text-brand-300 transition-all cursor-pointer flex items-center gap-1 font-mono text-[10.5px]"
-                            title={`Grounded on: ${src.title} (${src.relevance}% relevance)`}
-                          >
-                            <span className="text-emerald-400 font-bold">{src.relevance}%</span>
-                            <span className="max-w-[130px] truncate">{src.title}</span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
 
                     {detailsText && (
                       <div className="mt-4 max-w-full">
@@ -1074,7 +1011,7 @@ export default function ChatInterface({ agent }: ChatInterfaceProps) {
                             <Bot size={16} className={agentTheme.iconText} />
                           </div>
                           <span className={`text-[11px] font-bold ${agentTheme.text} uppercase tracking-wider`}>
-                            {agent === 'Multi-Agent Hub' ? 'Agents are synthesizing with RAG...' : `${agent} is retrieving & typing...`}
+                            {agent === 'Multi-Agent Hub' ? 'Agents are synthesizing...' : `${agent} is thinking & typing...`}
                           </span>
                         </div>
                         <div className="flex gap-1.5 py-3.5 px-4 bg-[var(--color-bg-tertiary)] border border-[var(--color-border-primary)] rounded-2xl rounded-tl-sm w-fit items-center shadow-sm">
@@ -1096,15 +1033,7 @@ export default function ChatInterface({ agent }: ChatInterfaceProps) {
           <div className="max-w-4xl mx-auto flex flex-col gap-2 relative">
             <div className="absolute inset-0 bg-brand-500/10 blur-xl rounded-full opacity-40 -z-10"></div>
             
-            <div className="flex items-end bg-black/40 backdrop-blur-xl rounded-2xl w-full shadow-2xl border border-white/10 focus-within:border-brand-500/40 focus-within:bg-black/60 transition-all duration-300 overflow-hidden group">
-              <button 
-                onClick={() => setRAGModalOpen(true, agent)}
-                className="text-gray-400 hover:text-brand-400 transition-colors flex-shrink-0 p-3 ml-1 cursor-pointer" 
-                title="Open RAG Knowledge Base"
-              >
-                <BrainCircuit size={18} strokeWidth={2} />
-              </button>
-
+            <div className="flex items-end bg-black/40 backdrop-blur-xl rounded-2xl w-full shadow-2xl border border-white/10 focus-within:border-brand-500/40 focus-within:bg-black/60 transition-all duration-300 overflow-hidden group pl-4">
               <textarea
                 value={localQuery}
                 onChange={(e) => setLocalQuery(e.target.value)}
@@ -1114,7 +1043,7 @@ export default function ChatInterface({ agent }: ChatInterfaceProps) {
                     if (localQuery.trim()) handleRunAgent(e as any);
                   }
                 }}
-                placeholder={isRunning ? "Agent is retrieving RAG context & reasoning..." : `Ask ${agent} (Grounded with RAG)...`}
+                placeholder={isRunning ? "Agent is reasoning & generating response..." : `Ask ${agent}...`}
                 disabled={isRunning}
                 rows={1}
                 className="flex-1 bg-transparent text-[13.5px] text-gray-200 outline-none placeholder-gray-500 disabled:opacity-50 py-3.5 resize-none max-h-32 min-h-[50px] custom-scrollbar"
@@ -1135,7 +1064,7 @@ export default function ChatInterface({ agent }: ChatInterfaceProps) {
                   !localQuery.trim() ? 'bg-white/5 text-gray-500 cursor-not-allowed' :
                   'bg-brand-500 hover:bg-brand-400 hover:shadow-lg hover:shadow-brand-500/25 hover:-translate-y-0.5 text-white shadow-sm'
                 }`}
-                title="Send grounded query"
+                title="Send message"
               >
                 {isRunning ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} className="ml-0.5" />}
               </button>
@@ -1144,7 +1073,7 @@ export default function ChatInterface({ agent }: ChatInterfaceProps) {
             <div className="flex items-center justify-between text-[10.5px] text-gray-500 px-2">
               <span className="flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" />
-                RAG Engine: Hybrid Dense Vector + BM25 Lexical
+                Advanced LLM Intelligence Active
               </span>
               <span>AI can make mistakes. Verify important information.</span>
             </div>

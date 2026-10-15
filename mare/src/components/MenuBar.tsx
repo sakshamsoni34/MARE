@@ -4,6 +4,7 @@ import { useStore } from '@/store/useStore';
 import { PanelLeft, PanelBottom, PanelRight, Search, UserCircle, Bot } from 'lucide-react';
 import { useSession, signOut } from 'next-auth/react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { openWorkspaceFolder } from '@/lib/workspace';
 
 type MenuState = 'File' | 'Edit' | 'View' | 'Terminal' | 'Help' | 'Settings' | 'Profile' | null;
 
@@ -103,22 +104,11 @@ export default function MenuBar({ onNewFile, onNewFolder, showProfile = false, s
   };
 
   const handleOpenFolder = async () => {
-    if (status !== 'authenticated') {
-      useStore.getState().setSignInModalOpen(true);
-      return;
-    }
-    try {
-      const dirHandle = await (window as any).showDirectoryPicker({ mode: 'readwrite' });
-      const children = await readDirectory(dirHandle);
-      useStore.getState().setFileSystem(children);
-      useStore.getState().setActiveProject(dirHandle.name);
-      addTerminalLog(`> <span class="text-green-400">Success:</span> Loaded workspace [${dirHandle.name}]`);
-      await handleAction("Open Folder", dirHandle.name);
-      router.push('/dashboard');
-    } catch (err: unknown) {
-      if (err instanceof Error && err.name === 'AbortError') return;
-      addTerminalLog(`> <span class="text-red-400">Error:</span> Failed to open folder`);
-    }
+    openWorkspaceFolder({
+      status,
+      onRequireAuth: () => useStore.getState().setSignInModalOpen(true),
+      onSuccess: () => router.push('/dashboard')
+    });
   };
 
   const handleSaveFile = async () => {
@@ -196,8 +186,6 @@ export default function MenuBar({ onNewFile, onNewFolder, showProfile = false, s
     if (activeMenu === 'View') {
       return (
         <DropdownWrapper left={120}><div className="w-72">
-          <MenuItem label="Open RAG Knowledge Base" onClick={() => useStore.getState().setRAGModalOpen(true, 'all')} />
-          <MenuItem divider />
           <MenuItem label="Toggle Explorer Sidebar" onClick={toggleSidebar} />
           <MenuItem label="Toggle Orqion Chat" onClick={toggleRightSidebar} />
           <MenuItem label="Toggle Terminal Panel" shortcut="Ctrl+`" onClick={toggleTerminal} />
@@ -230,6 +218,7 @@ export default function MenuBar({ onNewFile, onNewFolder, showProfile = false, s
               <MenuItem divider />
               <MenuItem label="Sign Out" onClick={() => {
                 useStore.getState().setActiveProject('');
+                useStore.getState().setFileSystem([]);
                 signOut({ callbackUrl: '/' });
               }} />
             </>

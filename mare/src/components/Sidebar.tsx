@@ -11,9 +11,7 @@ import {
   Folder, 
   Cog, 
   Network, 
-  Users, 
-  Sparkles, 
-  RefreshCw 
+  Users
 } from 'lucide-react';
 import { useStore, Agent } from '@/store/useStore';
 import Explorer from '@/components/Explorer';
@@ -41,29 +39,16 @@ const ActivityIcon = ({ icon, label, isActive, onClick }: any) => (
 
 const CategoryHeader = ({ 
   title, 
-  count, 
-  onSync, 
-  isSyncing 
+  count 
 }: { 
   title: string; 
   count: number; 
-  onSync: () => void; 
-  isSyncing: boolean; 
 }) => (
   <div className="px-3 pt-1 pb-2 border-b border-white/5 mb-1 flex items-center justify-between">
     <div className="flex items-center gap-1.5">
       <span className="text-[10px] font-bold tracking-widest text-text-tertiary uppercase">{title}</span>
       <span className="text-[9px] font-semibold px-1.5 py-0.2 rounded-full bg-white/5 text-gray-400 border border-white/5">{count}</span>
     </div>
-    <button
-      onClick={onSync}
-      disabled={isSyncing}
-      title="Sync workspace files to agent RAG vector store"
-      className="flex items-center gap-1 text-[10px] text-brand-400 hover:text-brand-300 transition-colors cursor-pointer disabled:opacity-50"
-    >
-      <RefreshCw size={10} className={isSyncing ? 'animate-spin' : ''} />
-      <span>Sync RAG</span>
-    </button>
   </div>
 );
 
@@ -71,14 +56,12 @@ const AgentItem = ({
   agent, 
   displayName, 
   activeAgent, 
-  handleAgentClick,
-  onOpenRAG 
+  handleAgentClick 
 }: { 
   agent: string; 
   displayName?: string; 
   activeAgent: Agent | null; 
   handleAgentClick: (a: Agent) => void;
-  onOpenRAG: (agentName: string) => void;
 }) => {
   const isActive = activeAgent === agent;
   return (
@@ -100,18 +83,6 @@ const AgentItem = ({
           {displayName || agent.replace(' Agent', '')}
         </span>
       </div>
-
-      {/* Integrated Knowledge Trigger */}
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          onOpenRAG(agent);
-        }}
-        title={`Inspect RAG Knowledge Base & Grounding for ${agent}`}
-        className="shrink-0 flex items-center justify-center p-1 rounded-md text-[9px] transition-all duration-200 bg-brand-500/10 hover:bg-brand-500/25 text-brand-300 border border-brand-500/20 hover:border-brand-500/40 hover:scale-105 active:scale-95 cursor-pointer ml-1.5"
-      >
-        <Sparkles size={11} className="text-brand-400" />
-      </button>
     </div>
   );
 };
@@ -125,14 +96,11 @@ export default function Sidebar() {
     isWorkflowOpen, 
     activeProject, 
     isSidebarOpen, 
-    toggleSidebar, 
-    setRAGModalOpen, 
-    addTerminalLog 
+    toggleSidebar 
   } = useStore();
 
   const [activeTab, setActiveTab] = useState<ActivityTab | null>('Explorer');
   const [showToast, setShowToast] = useState(false);
-  const [syncingRAG, setSyncingRAG] = useState(false);
 
   const handleAgentClick = (agent: Agent) => {
     if (!activeProject) {
@@ -155,29 +123,6 @@ export default function Sidebar() {
     }
   };
 
-  const handleQuickRAGSync = async () => {
-    setSyncingRAG(true);
-    addTerminalLog('> Status: <span class="text-accent-yellow">Syncing workspace files to RAG vector database...</span>');
-    try {
-      const res = await fetch('http://localhost:8555/api/rag/reindex', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ include_workspace_files: true })
-      });
-      if (res.ok) {
-        addTerminalLog('> Status: <span class="text-accent-green">RAG Vector Store indexed all workspace files successfully.</span>');
-      }
-    } catch (e: any) {
-      addTerminalLog(`> <span class="text-accent-red">RAG Sync Error:</span> ${e.message}`);
-    } finally {
-      setSyncingRAG(false);
-    }
-  };
-
-  const handleOpenAgentRAG = (agentName: string) => {
-    setRAGModalOpen(true, agentName);
-  };
-
   const renderPanelContent = () => {
     switch(activeTab) {
       case 'Explorer':
@@ -185,217 +130,192 @@ export default function Sidebar() {
       case 'Hub':
         return (
           <div className="flex flex-col gap-1 py-1">
-            <CategoryHeader title="Orchestration Hub" count={1} onSync={handleQuickRAGSync} isSyncing={syncingRAG} />
+            <CategoryHeader title="Orchestration Hub" count={1} />
             <AgentItem 
               agent="Multi-Agent Hub" 
               displayName="Multi-Agent Hub"
               activeAgent={activeAgent} 
               handleAgentClick={handleAgentClick}
-              onOpenRAG={handleOpenAgentRAG}
             />
           </div>
         );
       case 'Planning':
         return (
           <div className="flex flex-col gap-1 py-1">
-            <CategoryHeader title="Planning & Strategy" count={3} onSync={handleQuickRAGSync} isSyncing={syncingRAG} />
+            <CategoryHeader title="Planning & Strategy" count={3} />
             <AgentItem 
               agent="Planner Agent" 
-              displayName="Planner Agent"
+              displayName="Planner Agent" 
               activeAgent={activeAgent} 
               handleAgentClick={handleAgentClick} 
-              onOpenRAG={handleOpenAgentRAG}
             />
             <AgentItem 
               agent="Task Decomposer Agent" 
               displayName="Task Decomposer" 
               activeAgent={activeAgent} 
               handleAgentClick={handleAgentClick} 
-              onOpenRAG={handleOpenAgentRAG}
             />
             <AgentItem 
               agent="Goal Manager Agent" 
               displayName="Goal Manager" 
               activeAgent={activeAgent} 
               handleAgentClick={handleAgentClick} 
-              onOpenRAG={handleOpenAgentRAG}
             />
           </div>
         );
       case 'Research':
         return (
           <div className="flex flex-col gap-1 py-1">
-            <CategoryHeader title="Research & Discovery" count={4} onSync={handleQuickRAGSync} isSyncing={syncingRAG} />
+            <CategoryHeader title="Research & Discovery" count={4} />
             <AgentItem 
               agent="Web Search Agent" 
               displayName="Web Research" 
               activeAgent={activeAgent} 
               handleAgentClick={handleAgentClick} 
-              onOpenRAG={handleOpenAgentRAG}
             />
             <AgentItem 
               agent="Academic Research Agent" 
               displayName="Academic Research" 
               activeAgent={activeAgent} 
               handleAgentClick={handleAgentClick} 
-              onOpenRAG={handleOpenAgentRAG}
             />
             <AgentItem 
               agent="Browser Agent" 
-              displayName="Browser Agent"
+              displayName="Browser Agent" 
               activeAgent={activeAgent} 
               handleAgentClick={handleAgentClick} 
-              onOpenRAG={handleOpenAgentRAG}
             />
             <AgentItem 
               agent="News Agent" 
-              displayName="News Agent"
+              displayName="News Agent" 
               activeAgent={activeAgent} 
               handleAgentClick={handleAgentClick} 
-              onOpenRAG={handleOpenAgentRAG}
             />
           </div>
         );
       case 'Execution':
         return (
           <div className="flex flex-col gap-1 py-1">
-            <CategoryHeader title="Software & Execution" count={4} onSync={handleQuickRAGSync} isSyncing={syncingRAG} />
+            <CategoryHeader title="Software & Execution" count={4} />
             <AgentItem 
               agent="Code Agent" 
-              displayName="Code Architect"
+              displayName="Code Architect" 
               activeAgent={activeAgent} 
               handleAgentClick={handleAgentClick} 
-              onOpenRAG={handleOpenAgentRAG}
             />
             <AgentItem 
               agent="Python Agent" 
-              displayName="Python Specialist"
+              displayName="Python Specialist" 
               activeAgent={activeAgent} 
               handleAgentClick={handleAgentClick} 
-              onOpenRAG={handleOpenAgentRAG}
             />
             <AgentItem 
               agent="Executor Agent" 
               displayName="API Executor" 
               activeAgent={activeAgent} 
               handleAgentClick={handleAgentClick} 
-              onOpenRAG={handleOpenAgentRAG}
             />
             <AgentItem 
               agent="Automation Agent" 
-              displayName="Automation Agent"
+              displayName="Automation Agent" 
               activeAgent={activeAgent} 
               handleAgentClick={handleAgentClick} 
-              onOpenRAG={handleOpenAgentRAG}
             />
           </div>
         );
       case 'Analysis':
         return (
           <div className="flex flex-col gap-1 py-1">
-            <CategoryHeader title="Analysis & QA" count={5} onSync={handleQuickRAGSync} isSyncing={syncingRAG} />
+            <CategoryHeader title="Analysis & QA" count={5} />
             <AgentItem 
               agent="Data Analysis Agent" 
               displayName="Data Analysis" 
               activeAgent={activeAgent} 
               handleAgentClick={handleAgentClick} 
-              onOpenRAG={handleOpenAgentRAG}
             />
             <AgentItem 
               agent="Visualization Agent" 
-              displayName="Visualization"
+              displayName="Visualization" 
               activeAgent={activeAgent} 
               handleAgentClick={handleAgentClick} 
-              onOpenRAG={handleOpenAgentRAG}
             />
             <AgentItem 
               agent="Validation Agent" 
-              displayName="Validation QA"
+              displayName="Validation QA" 
               activeAgent={activeAgent} 
               handleAgentClick={handleAgentClick} 
-              onOpenRAG={handleOpenAgentRAG}
             />
             <AgentItem 
               agent="Reviewer Agent" 
-              displayName="Code Reviewer"
+              displayName="Code Reviewer" 
               activeAgent={activeAgent} 
               handleAgentClick={handleAgentClick} 
-              onOpenRAG={handleOpenAgentRAG}
             />
             <AgentItem 
               agent="Tester Agent" 
-              displayName="Tester Agent"
+              displayName="Tester Agent" 
               activeAgent={activeAgent} 
               handleAgentClick={handleAgentClick} 
-              onOpenRAG={handleOpenAgentRAG}
             />
           </div>
         );
       case 'Reporting':
         return (
           <div className="flex flex-col gap-1 py-1">
-            <CategoryHeader title="Reporting & Presentation" count={4} onSync={handleQuickRAGSync} isSyncing={syncingRAG} />
+            <CategoryHeader title="Reporting & Presentation" count={4} />
             <AgentItem 
               agent="Report Generator Agent" 
               displayName="Report Generator" 
               activeAgent={activeAgent} 
               handleAgentClick={handleAgentClick} 
-              onOpenRAG={handleOpenAgentRAG}
             />
             <AgentItem 
               agent="Presentation Agent" 
-              displayName="Presentation"
+              displayName="Presentation" 
               activeAgent={activeAgent} 
               handleAgentClick={handleAgentClick} 
-              onOpenRAG={handleOpenAgentRAG}
             />
             <AgentItem 
               agent="Designer Agent" 
-              displayName="UI/UX Designer"
+              displayName="UI/UX Designer" 
               activeAgent={activeAgent} 
               handleAgentClick={handleAgentClick} 
-              onOpenRAG={handleOpenAgentRAG}
             />
             <AgentItem 
               agent="Export Agent" 
               displayName="Data Export" 
               activeAgent={activeAgent} 
               handleAgentClick={handleAgentClick} 
-              onOpenRAG={handleOpenAgentRAG}
             />
           </div>
         );
       case 'Monitoring':
         return (
           <div className="flex flex-col gap-1 py-1">
-            <CategoryHeader title="Monitoring & Telemetry" count={4} onSync={handleQuickRAGSync} isSyncing={syncingRAG} />
+            <CategoryHeader title="Monitoring & Telemetry" count={4} />
             <AgentItem 
               agent="Live Workflow Agent" 
               displayName="Live Workflow" 
               activeAgent={activeAgent} 
               handleAgentClick={handleAgentClick} 
-              onOpenRAG={handleOpenAgentRAG}
             />
             <AgentItem 
               agent="Agent Communication Agent" 
               displayName="Agent Network" 
               activeAgent={activeAgent} 
               handleAgentClick={handleAgentClick} 
-              onOpenRAG={handleOpenAgentRAG}
             />
             <AgentItem 
               agent="Logs Agent" 
               displayName="System Logs" 
               activeAgent={activeAgent} 
               handleAgentClick={handleAgentClick} 
-              onOpenRAG={handleOpenAgentRAG}
             />
             <AgentItem 
               agent="Events Agent" 
               displayName="Event Stream" 
               activeAgent={activeAgent} 
               handleAgentClick={handleAgentClick} 
-              onOpenRAG={handleOpenAgentRAG}
             />
           </div>
         );
@@ -406,7 +326,7 @@ export default function Sidebar() {
           <div className="p-4 text-text-secondary text-xs flex flex-col gap-3">
             <div className="font-semibold text-white">System Settings</div>
             <p className="text-[11px] text-gray-400">
-              RAG grounding is active on all agents in your workspace. Select any agent from the categories to view or configure its vector knowledge memory.
+              Direct high-performance LLM intelligence active on all workspace agents.
             </p>
           </div>
         );
@@ -435,7 +355,7 @@ export default function Sidebar() {
       </AnimatePresence>
 
       <div className="flex h-full border-r border-white/5 shrink-0 z-20 bg-[#0a0a0a]">
-        {/* Activity Bar (Icons only - RAG is embedded into each agent) */}
+        {/* Activity Bar */}
         <aside className="w-14 shrink-0 bg-[#050505] flex flex-col items-center py-3 h-full border-r border-white/5 z-10 relative">
           <ActivityIcon icon={<Home size={20} strokeWidth={1.5} />} label="Explorer" isActive={activeTab === 'Explorer'} onClick={() => handleTabClick('Explorer')} />
           <ActivityIcon icon={<Users size={20} strokeWidth={1.5} />} label="Multi-Agent Hub" isActive={activeTab === 'Hub'} onClick={() => handleTabClick('Hub')} />
@@ -468,7 +388,7 @@ export default function Sidebar() {
                 <span>{activeTab}</span>
                 <span className="flex items-center gap-1 text-[9px] font-semibold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  RAG Active
+                  MARE
                 </span>
               </div>
               <div className="flex-1 overflow-y-auto pt-2 pb-4 w-[260px]">

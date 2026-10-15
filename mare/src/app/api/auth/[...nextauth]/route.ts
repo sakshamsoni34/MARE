@@ -1,6 +1,6 @@
 import NextAuth, { NextAuthOptions } from 'next-auth';
 import GoogleProvider from 'next-auth/providers/google';
-import { getDb } from '@/lib/db';
+import CredentialsProvider from 'next-auth/providers/credentials';
 
 const authOptions: NextAuthOptions = {
     providers: [
@@ -8,39 +8,35 @@ const authOptions: NextAuthOptions = {
             clientId: process.env.GOOGLE_CLIENT_ID as string,
             clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
         }),
+        CredentialsProvider({
+            id: 'credentials',
+            name: 'Demo Account',
+            credentials: {
+                email: { label: 'Email', type: 'text' }
+            },
+            async authorize(credentials) {
+                const email = credentials?.email || 'developer@mare.ai';
+                return {
+                    id: '1',
+                    name: 'MARE Developer',
+                    email: email,
+                    image: null
+                };
+            }
+        })
     ],
     secret: process.env.NEXTAUTH_SECRET,
     session: {
         strategy: 'jwt',
-        maxAge: 60 * 60, // 1 hour token expiration (change to 2 * 60 * 60 for 2 hours)
+        maxAge: 60 * 60, // 1 hour token expiration
     },
     callbacks: {
-        async signIn({ user, account, profile }) {
-            if (account?.provider === 'google' && user.email) {
-                try {
-                    const db = await getDb();
-                    const dbUser = await db.get('SELECT id FROM users WHERE email = ?', [user.email]);
-                    
-                    if (!dbUser) {
-                        const result = await db.run(
-                            'INSERT INTO users (email, password_hash, first_name, last_name, is_active) VALUES (?, ?, ?, ?, ?)',
-                            [user.email, 'oauth', user.name?.split(' ')[0] || '', user.name?.split(' ')[1] || '', 1]
-                        );
-                        user.id = result.lastID.toString();
-                    } else {
-                        user.id = dbUser.id.toString();
-                    }
-                    return true;
-                } catch (error) {
-                    console.error("Error during sign in database operation:", error);
-                    return false;
-                }
-            }
+        async signIn({ user }) {
             return true;
         },
         async jwt({ token, user }) {
             if (user) {
-                token.id = user.id;
+                token.id = user.id || user.email;
             }
             return token;
         },
@@ -51,7 +47,9 @@ const authOptions: NextAuthOptions = {
             return session;
         },
         async redirect({ url, baseUrl }) {
-            return baseUrl + '/dashboard';
+            if (url.startsWith('/')) return `${baseUrl}${url}`;
+            else if (new URL(url).origin === baseUrl) return url;
+            return baseUrl;
         },
     }
 };

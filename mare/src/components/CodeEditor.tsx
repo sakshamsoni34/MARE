@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import dynamic from 'next/dynamic';
-import { Code, Play, Save, BrainCircuit, X } from 'lucide-react';
+import { Code, Play, Save, X } from 'lucide-react';
 import { useStore, Agent, FileSystemNode } from '@/store/useStore';
 
 // Dynamically import Monaco Editor to reduce initial bundle size
@@ -27,9 +27,7 @@ export default function CodeEditor({ agent }: CodeEditorProps) {
     selectedFolderId, 
     updateNodeContent, 
     fileSystem, 
-    createFile,
-    setRAGModalOpen,
-    setAgentRAGSources
+    createFile
   } = useStore();
   
   const code = agentScripts[agent] || '';
@@ -57,7 +55,7 @@ export default function CodeEditor({ agent }: CodeEditorProps) {
     if (isRunning) return;
 
     setAgentRunning(agent, true);
-    addTerminalLog(`> Status: <span class="text-accent-yellow">INITIALIZING ${agent.toUpperCase()} (RAG GROUNDING ACTIVE)...</span>`);
+    addTerminalLog(`> Status: <span class="text-accent-yellow">INITIALIZING ${agent.toUpperCase()}...</span>`);
 
     try {
       const response = await fetch('http://localhost:8555/api/agent', {
@@ -77,13 +75,13 @@ export default function CodeEditor({ agent }: CodeEditorProps) {
         return;
       }
 
-      addTerminalLog(`> <span class="text-accent-green">${agent} connected & RAG grounded. Task executing...</span>`);
+      addTerminalLog(`> <span class="text-accent-green">${agent} connected. Task executing...</span>`);
 
       const reader = response.body?.getReader();
       const decoder = new TextDecoder();
 
       let currentScriptCode = agentScripts[agent] || '';
-      currentScriptCode += `\n\n# --- ${agent} Grounded Response ---\n\n`;
+      currentScriptCode += `\n\n# --- ${agent} Output ---\n\n`;
       updateAgentScript(agent, currentScriptCode);
       
       let lastUpdate = Date.now();
@@ -101,9 +99,6 @@ export default function CodeEditor({ agent }: CodeEditorProps) {
 
               try {
                 const parsed = JSON.parse(dataStr);
-                if (parsed.rag_sources) {
-                  setAgentRAGSources(agent, parsed.rag_sources);
-                }
                 const content = parsed.choices?.[0]?.delta?.content;
                 if (content) {
                   currentScriptCode += content;
@@ -235,31 +230,13 @@ export default function CodeEditor({ agent }: CodeEditorProps) {
           <Code size={16} className={isActive ? 'text-brand-400' : 'text-text-tertiary'} />
           <span className="font-medium">{agent}</span>
           
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setRAGModalOpen(true, agent);
-            }}
-            className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-all cursor-pointer shadow-sm ml-1"
-            title="Inspect RAG Knowledge Base for this code agent"
-          >
+          <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 ml-1">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            <span>RAG Active</span>
-          </button>
+            <span>MARE</span>
+          </span>
         </div>
         
         <div className="flex items-center gap-3.5 pb-2 -mb-3 text-gray-400">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setRAGModalOpen(true, agent);
-            }}
-            className="flex items-center justify-center text-brand-400 hover:text-brand-300 transition-colors cursor-pointer"
-            title="Open RAG Knowledge Base"
-          >
-            <BrainCircuit size={16} />
-          </button>
-          
           <button
             onClick={handleSave}
             className="flex items-center justify-center text-text-tertiary hover:text-accent-blue transition-colors cursor-pointer"
