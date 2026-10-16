@@ -1,16 +1,13 @@
 'use client';
 
 import React from 'react';
-import { useRouter } from 'next/navigation';
-import { Folder, FolderOpen, Activity, Cpu } from 'lucide-react';
+import { Activity, Cpu } from 'lucide-react';
 import { motion } from 'framer-motion';
 import MenuBar from '@/components/MenuBar';
 import Sidebar from '@/components/Sidebar';
 import dynamic from 'next/dynamic';
-import { useSession } from 'next-auth/react';
 import SignInModal from '@/components/SignInModal';
 import { useStore } from '@/store/useStore';
-import { openWorkspaceFolder } from '@/lib/workspace';
 
 const ParticleSphere = dynamic(() => import('@/components/ParticleSphere'), {
   ssr: false,
@@ -18,19 +15,9 @@ const ParticleSphere = dynamic(() => import('@/components/ParticleSphere'), {
 });
 
 export default function RootPage() {
-  const router = useRouter();
-  const { setActiveProject, runningAgents, activeProject } = useStore();
-  const { status } = useSession();
+  const { runningAgents } = useStore();
 
   const isAnyAgentRunning = Object.values(runningAgents || {}).some(Boolean);
-
-  const handleOpenFolder = () => {
-    openWorkspaceFolder({
-      status,
-      onRequireAuth: () => useStore.getState().setSignInModalOpen(true),
-      onSuccess: () => router.push('/dashboard')
-    });
-  };
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden text-base bg-[var(--color-bg-primary)] select-none">
@@ -79,26 +66,6 @@ export default function RootPage() {
                   }}
                 />
               </motion.div>
-
-              {status === 'authenticated' && !activeProject && (
-                <motion.div
-                  initial={{ opacity: 0, y: 15 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="absolute bottom-8 z-30 flex flex-col items-center gap-3 bg-[#0d0d0d]/80 border border-brand-500/30 backdrop-blur-xl px-6 py-4 rounded-2xl shadow-[0_10px_40px_rgba(139,92,246,0.15)]"
-                >
-                  <div className="flex items-center gap-2 text-white font-medium text-sm">
-                    <Folder size={18} className="text-brand-400" />
-                    <span>Select a workspace folder to start exploring</span>
-                  </div>
-                  <button
-                    onClick={handleOpenFolder}
-                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white text-xs font-semibold tracking-wide transition-all shadow-[0_0_20px_rgba(124,58,237,0.4)] hover:shadow-[0_0_30px_rgba(124,58,237,0.6)] cursor-pointer hover:scale-105 active:scale-95"
-                  >
-                    <FolderOpen size={16} />
-                    <span>Choose Workspace Folder</span>
-                  </button>
-                </motion.div>
-              )}
 
             </main>
           </div>

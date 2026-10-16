@@ -20,7 +20,18 @@ import {
   Layers,
   CheckCircle2,
   ExternalLink,
-  Copy
+  Copy,
+  ArrowUpRight,
+  Code2,
+  Search,
+  ShieldCheck,
+  Zap,
+  ArrowUp,
+  ArrowDown,
+  CornerRightUp,
+  ChevronDown,
+  ChevronUp,
+  Compass
 } from 'lucide-react';
 import { useStore, Agent, FileSystemNode } from '@/store/useStore';
 import { useSession } from 'next-auth/react';
@@ -156,6 +167,91 @@ const getAgentTheme = (agentName: string) => {
   return themes[Math.abs(hash) % themes.length];
 };
 
+const getAgentMeta = (agentName: string) => {
+  if (agentName.includes('Planner') || agentName.includes('Goal') || agentName.includes('Decomposer')) {
+    return {
+      Icon: BrainCircuit,
+      category: 'Strategic Planning & DAG Execution',
+      badge: 'CPM / WBS Engine',
+      chips: ['Critical Path Method', 'WBS Decomposition', 'Milestone Verification', 'Topological Sort'],
+      accentGradient: 'from-violet-500 via-purple-500 to-indigo-600',
+      glowColor: 'rgba(139, 92, 246, 0.25)',
+      textColor: 'text-purple-300',
+      borderColor: 'border-purple-500/30'
+    };
+  }
+  if (agentName.includes('Research') || agentName.includes('Search') || agentName.includes('News') || agentName.includes('Browser')) {
+    return {
+      Icon: Search,
+      category: 'Deep Research & Fact Synthesis',
+      badge: 'Empirical Intelligence',
+      chips: ['Live Fact Corroboration', 'ArXiv & Journals', 'Structured Extraction', 'Zero Noise'],
+      accentGradient: 'from-cyan-500 via-sky-500 to-blue-600',
+      glowColor: 'rgba(6, 182, 212, 0.25)',
+      textColor: 'text-cyan-300',
+      borderColor: 'border-cyan-500/30'
+    };
+  }
+  if (agentName.includes('Code') || agentName.includes('Python') || agentName.includes('Automation') || agentName.includes('Executor')) {
+    return {
+      Icon: Code2,
+      category: 'Software Architecture & Pipelines',
+      badge: 'Production Engine',
+      chips: ['SOLID Principles', 'Async Concurrency', 'Type Safety', 'Robust Handling'],
+      accentGradient: 'from-emerald-500 via-teal-500 to-green-600',
+      glowColor: 'rgba(16, 185, 129, 0.25)',
+      textColor: 'text-emerald-300',
+      borderColor: 'border-emerald-500/30'
+    };
+  }
+  if (agentName.includes('Reviewer') || agentName.includes('Validation') || agentName.includes('Tester')) {
+    return {
+      Icon: ShieldCheck,
+      category: 'Quality Assurance & Security Audit',
+      badge: 'Security Gate',
+      chips: ['Static Analysis', 'Boundary QA', 'Schema Verification', 'Vulnerability Scan'],
+      accentGradient: 'from-amber-500 via-orange-500 to-rose-600',
+      glowColor: 'rgba(245, 158, 11, 0.25)',
+      textColor: 'text-amber-300',
+      borderColor: 'border-amber-500/30'
+    };
+  }
+  if (agentName.includes('Designer') || agentName.includes('Presentation')) {
+    return {
+      Icon: Sparkles,
+      category: 'UI/UX Architecture & Layouts',
+      badge: 'Design System',
+      chips: ['Design Tokens', 'Glassmorphism', 'Micro-interactions', 'Responsive Grids'],
+      accentGradient: 'from-fuchsia-500 via-pink-500 to-rose-500',
+      glowColor: 'rgba(217, 70, 239, 0.25)',
+      textColor: 'text-fuchsia-300',
+      borderColor: 'border-fuchsia-500/30'
+    };
+  }
+  if (agentName.includes('Data') || agentName.includes('Visualization') || agentName.includes('Report') || agentName.includes('Export')) {
+    return {
+      Icon: Layers,
+      category: 'Data Analytics & Reporting',
+      badge: 'Analytics Engine',
+      chips: ['Exploratory Analysis', 'Interactive Visuals', 'Correlation Metrics', 'Executive Minto'],
+      accentGradient: 'from-blue-500 via-indigo-500 to-cyan-500',
+      glowColor: 'rgba(59, 130, 246, 0.25)',
+      textColor: 'text-blue-300',
+      borderColor: 'border-blue-500/30'
+    };
+  }
+  return {
+    Icon: Zap,
+    category: 'Autonomous Multi-Agent Core',
+    badge: 'Autonomous Agent',
+    chips: ['Context Chaining', 'Task Synthesis', 'Continuous Memory', 'Deterministic Outputs'],
+    accentGradient: 'from-brand-500 via-indigo-500 to-purple-600',
+    glowColor: 'rgba(139, 92, 246, 0.25)',
+    textColor: 'text-brand-300',
+    borderColor: 'border-brand-500/30'
+  };
+};
+
 const CodeSnippet = ({ code, language }: { code: string; language: string }) => {
   const [copied, setCopied] = useState(false);
 
@@ -188,6 +284,23 @@ const formatInline = (text: string, agentTheme: any) => {
     .replace(/\*(.*?)\*/g, '<em class="italic text-gray-300">$1</em>')
     .replace(/`(.*?)`/g, `<code class="${agentTheme.bg} text-brand-300 px-1.5 py-0.5 rounded text-[12px] font-mono border ${agentTheme.border}">$1</code>`)
     .replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" target="_blank" rel="noreferrer" class="text-brand-400 hover:underline underline-offset-2">$1</a>');
+};
+
+const extractHeadings = (text: string) => {
+  const headingRegex = /^#{1,4}\s+(.+)$/gm;
+  const headings: { title: string; slug: string }[] = [];
+  let match;
+  while ((match = headingRegex.exec(text)) !== null) {
+    const raw = match[1].replace(/[*_`]/g, '').trim();
+    if (raw && !raw.includes('===DETAILS===')) {
+      headings.push({
+        title: raw,
+        slug: raw.toLowerCase().replace(/[^a-z0-9]+/g, '-')
+      });
+      if (headings.length >= 8) break;
+    }
+  }
+  return headings;
 };
 
 const renderTextAndTables = (textBlock: string, agentTheme: any, keyPrefix: number) => {
@@ -267,9 +380,10 @@ const renderTextAndTables = (textBlock: string, agentTheme: any, keyPrefix: numb
     if (headerMatch) {
       const level = headerMatch[1].length;
       const title = headerMatch[2];
+      const headerSlug = title.replace(/<[^>]*>?/gm, '').replace(/[*_`]/g, '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-');
       const sizeClass = level === 1 ? 'text-lg font-bold text-white mt-5 mb-2.5' : level === 2 ? 'text-base font-semibold text-white mt-4 mb-2' : 'text-[14.5px] font-semibold text-white mt-3.5 mb-1.5';
       elements.push(
-        <div key={`${keyPrefix}-h-${i}`} className={`tracking-tight flex items-center gap-2 ${sizeClass}`}>
+        <div key={`${keyPrefix}-h-${i}`} id={`sec-${headerSlug}`} className={`tracking-tight flex items-center gap-2 ${sizeClass} scroll-mt-6`}>
           <span dangerouslySetInnerHTML={{ __html: formatInline(title, agentTheme) }} />
         </div>
       );
@@ -391,7 +505,43 @@ export default function ChatInterface({ agent }: ChatInterfaceProps) {
   const [localQuery, setLocalQuery] = useState('');
   const [expandedSection, setExpandedSection] = useState<{ msgId: string, idx: number } | null>(null);
   const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null);
+  const [collapsedResponses, setCollapsedResponses] = useState<Record<string, boolean>>({});
+  const [focusMessage, setFocusMessage] = useState<{ id: string; senderName: string; text: string } | null>(null);
+  const [showScrollTop, setShowScrollTop] = useState(false);
+  const [showScrollBottom, setShowScrollBottom] = useState(false);
   const agentTheme = getAgentTheme(agent);
+  const meta = getAgentMeta(agent);
+
+  const handleChatScroll = () => {
+    if (!scrollRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
+    setShowScrollTop(scrollTop > 180);
+    setShowScrollBottom(scrollHeight - scrollTop - clientHeight > 180);
+  };
+
+  const scrollToTop = () => {
+    scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const scrollToBottom = () => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
+    }
+  };
+
+  const scrollToSection = (slug: string) => {
+    const el = document.getElementById(`sec-${slug}`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
+  const scrollToUserQuery = (queryId: string) => {
+    const el = document.getElementById(queryId);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
 
   const initialText = `# ${agent} Script\n\n# Write your ${agent.toLowerCase()} prompt here...\n`;
   const isLegacyInitialState = code.trim().startsWith('#') && !code.includes('**You:**') && !code.includes(`**${agent}:**`);
@@ -763,28 +913,50 @@ export default function ChatInterface({ agent }: ChatInterfaceProps) {
 
   return (
     <div
-      className={`relative flex flex-1 flex-col rounded-xl border bg-[#1e1e1e] overflow-hidden shadow-lg mx-1 min-w-[300px] transition-all ${isActive ? 'border-brand-500/50 ring-1 ring-brand-500/20' : 'border-[var(--color-border-primary)] opacity-90'}`}
+      className={`relative flex flex-1 flex-col rounded-2xl border bg-[#0a0a0f]/95 backdrop-blur-2xl overflow-hidden shadow-2xl mx-1 min-w-[300px] transition-all duration-300 ${
+        isActive 
+          ? 'border-brand-500/40 ring-1 ring-brand-500/20 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.8)]' 
+          : 'border-white/[0.07] opacity-95 hover:border-white/15'
+      }`}
       onClick={() => setActiveAgent(agent)}
     >
+      {/* Ambient Top Glow */}
+      <div 
+        className="pointer-events-none absolute -top-32 left-1/2 -translate-x-1/2 w-[520px] h-64 rounded-full blur-[110px] opacity-25"
+        style={{ background: meta.glowColor }}
+      />
+
       {/* Agent Chat Header */}
-      <div className="flex items-center justify-between bg-black/20 backdrop-blur-md px-5 py-3.5 border-b border-white/5 relative z-10 shadow-sm">
-        <div className="flex items-center gap-2.5">
-          <span className="font-semibold text-[14px] text-blue-400">{agent === 'Orqion' ? 'Orqion' : agent}</span>
-          
-          <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/25">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="font-mono">MARE</span>
-          </span>
+      <div className="flex items-center justify-between bg-black/40 backdrop-blur-xl px-4 py-3 border-b border-white/[0.07] relative z-20">
+        <div className="flex items-center gap-3">
+          <div className="relative w-8 h-8 rounded-xl bg-gradient-to-br from-white/10 to-white/[0.02] border border-white/15 flex items-center justify-center shadow-inner">
+            <meta.Icon size={16} className={meta.textColor} />
+            <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-400 border border-[#0a0a0f]" />
+          </div>
+
+          <div className="flex flex-col">
+            <div className="flex items-center gap-2">
+              <span className="font-semibold text-[13.5px] text-white tracking-tight">
+                {agent === 'Orqion' ? 'Orqion' : agent}
+              </span>
+              <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9.5px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="font-mono tracking-wider">MARE</span>
+              </span>
+            </div>
+            <span className="text-[10px] text-gray-400 tracking-wide font-mono">
+              {meta.category}
+            </span>
+          </div>
         </div>
 
-        <div className="flex items-center gap-4 text-gray-400">
-
+        <div className="flex items-center gap-1 text-gray-400">
           <button
             onClick={handleSave}
-            className="flex items-center justify-center hover:text-white transition-colors cursor-pointer"
+            className="p-2 rounded-lg hover:bg-white/[0.08] hover:text-white transition-all cursor-pointer border border-transparent hover:border-white/10"
             title="Save to File System"
           >
-            <Save size={17} strokeWidth={2} />
+            <Save size={15} />
           </button>
 
           <button
@@ -795,19 +967,21 @@ export default function ChatInterface({ agent }: ChatInterfaceProps) {
                 updateAgentScript(agent, `# ${agent} Script\n\n# Write your ${agent.toLowerCase()} prompt here...\n`);
               }
             }}
-            className="flex items-center justify-center hover:text-white transition-colors cursor-pointer"
+            className="p-2 rounded-lg hover:bg-white/[0.08] hover:text-white transition-all cursor-pointer border border-transparent hover:border-white/10"
             title="New Conversation"
           >
-            <Plus size={18} strokeWidth={2} />
+            <Plus size={16} />
           </button>
 
           <button
             onClick={(e) => { e.stopPropagation(); setShowHistoryModal(true); }}
-            className="flex items-center justify-center hover:text-white transition-colors cursor-pointer"
+            className="p-2 rounded-lg hover:bg-white/[0.08] hover:text-white transition-all cursor-pointer border border-transparent hover:border-white/10"
             title="Past Conversations"
           >
-            <History size={16} strokeWidth={2} />
+            <History size={15} />
           </button>
+
+          <div className="w-px h-4 bg-white/10 mx-1" />
 
           <button
             onClick={(e) => { 
@@ -818,10 +992,10 @@ export default function ChatInterface({ agent }: ChatInterfaceProps) {
                 removeOpenAgent(agent); 
               }
             }}
-            className="flex items-center justify-center hover:text-white transition-colors cursor-pointer ml-1"
+            className="p-2 rounded-lg hover:bg-red-500/15 hover:text-red-400 hover:border-red-500/20 transition-all cursor-pointer border border-transparent"
             title="Close"
           >
-            <X size={17} strokeWidth={2} />
+            <X size={15} />
           </button>
         </div>
       </div>
@@ -830,30 +1004,59 @@ export default function ChatInterface({ agent }: ChatInterfaceProps) {
         {/* Chat History / Initial State Area */}
         <div
           ref={scrollRef}
-          className="w-full flex-1 overflow-y-auto p-4 text-gray-300 font-sans text-sm whitespace-pre-wrap break-words custom-scrollbar flex flex-col"
+          onScroll={handleChatScroll}
+          className={`w-full flex-1 p-3 text-gray-300 font-sans text-sm whitespace-pre-wrap break-words custom-scrollbar flex flex-col ${
+            hasMessages ? 'overflow-y-auto' : 'overflow-hidden justify-center'
+          }`}
           style={{ fontFamily: "Inter, sans-serif", lineHeight: 1.6 }}
         >
           {!hasMessages ? (
-            <div className="flex-1 flex flex-col items-center justify-center min-h-full animate-in fade-in duration-500 max-w-2xl mx-auto w-full py-8">
-              <div className="w-14 h-14 bg-brand-500/10 rounded-2xl flex items-center justify-center mb-6 ring-1 ring-brand-500/20 shadow-inner">
-                <Bot size={28} className="text-brand-400" />
+            <div className="flex flex-col items-center justify-center max-w-3xl mx-auto w-full relative z-10 animate-in fade-in duration-300 my-auto py-4 px-4">
+              
+              {/* Emblem Badge */}
+              <div className="relative flex items-center justify-center mb-4 group">
+                <div 
+                  className="absolute -inset-3 rounded-3xl blur-2xl opacity-60 group-hover:opacity-100 transition-opacity duration-700 animate-pulse pointer-events-none"
+                  style={{ background: `radial-gradient(circle, ${meta.glowColor} 0%, transparent 70%)` }}
+                />
+                <div className="relative w-16 h-16 rounded-2xl bg-gradient-to-b from-white/10 to-white/[0.02] border border-white/20 backdrop-blur-xl flex items-center justify-center shadow-[0_8px_32px_rgba(0,0,0,0.6),inset_0_1px_1px_rgba(255,255,255,0.3)] group-hover:scale-105 transition-transform duration-300">
+                  <meta.Icon size={30} className={meta.textColor} />
+                  <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-emerald-500 border-2 border-[#0a0a0f] flex items-center justify-center">
+                    <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
+                  </div>
+                </div>
               </div>
-              <h1 className="text-2xl font-semibold text-white tracking-tight mb-2">{agent}</h1>
-              <p className="text-gray-400 text-center max-w-md mb-8 text-[13.5px] leading-relaxed">
+
+              {/* Agent Title */}
+              <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-center mb-2.5 bg-gradient-to-r from-white via-zinc-100 to-zinc-400 bg-clip-text text-transparent">
+                {agent}
+              </h1>
+
+              {/* Description */}
+              <p className="text-gray-400 text-center max-w-lg mb-8 text-[13.5px] leading-relaxed">
                 {AGENT_CONFIGS[agent]?.description || "How can I assist you with your tasks today?"}
               </p>
 
+              {/* Interactive Prompt Cards */}
               {AGENT_CONFIGS[agent]?.prompts && agent !== 'Multi-Agent Hub' && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 w-full">
                   {AGENT_CONFIGS[agent].prompts.map((prompt, i) => (
                     <button
                       key={i}
                       onClick={() => setLocalQuery(prompt)}
-                      className="text-left px-5 py-3.5 rounded-xl border border-white/5 bg-white/5 hover:border-brand-500/30 hover:bg-brand-500/10 hover:-translate-y-0.5 transition-all duration-300 text-[13px] text-gray-300 flex items-start gap-3 group relative overflow-hidden shadow-sm hover:shadow-md cursor-pointer"
+                      className="text-left px-5 py-4 rounded-2xl border border-white/[0.08] bg-gradient-to-br from-white/[0.035] to-white/[0.01] hover:from-white/[0.07] hover:to-white/[0.02] hover:border-brand-500/40 hover:-translate-y-1 transition-all duration-200 text-gray-300 flex items-center justify-between gap-4 group relative overflow-hidden shadow-sm hover:shadow-[0_8px_30px_rgba(139,92,246,0.15)] cursor-pointer"
                     >
-                      <div className="absolute inset-0 bg-gradient-to-br from-brand-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                      <MessageSquare size={14} className="mt-0.5 text-gray-500 group-hover:text-brand-400 transition-colors shrink-0 relative z-10" />
-                      <span className="leading-snug relative z-10">{prompt}</span>
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className="text-[10px] font-mono font-bold text-gray-500 group-hover:text-brand-400 uppercase tracking-wider px-2 py-0.5 rounded-md bg-white/5 border border-white/5 shrink-0">
+                          0{i + 1}
+                        </span>
+                        <span className="text-[13px] text-gray-200 group-hover:text-white font-medium leading-snug">
+                          {prompt}
+                        </span>
+                      </div>
+                      <div className="w-6 h-6 rounded-lg bg-white/5 group-hover:bg-brand-500/20 flex items-center justify-center text-gray-400 group-hover:text-brand-300 shrink-0 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5">
+                        <ArrowUpRight size={13} />
+                      </div>
                     </button>
                   ))}
                 </div>
@@ -956,10 +1159,19 @@ export default function ChatInterface({ agent }: ChatInterfaceProps) {
 
               return (
                 <div className="flex flex-col gap-6 pb-2">
-                  {messages.map((msg) => {
+                  {messages.map((msg, msgIdx) => {
                     const msgAgentTheme = getAgentTheme(msg.senderName);
+                    const isCollapsed = collapsedResponses[msg.id];
+                    const isLong = msg.text.length > 500;
+                    const headings = msg.sender !== 'user' ? extractHeadings(msg.text) : [];
+                    const precedingUserQuery = messages.slice(0, msgIdx).filter(m => m.sender === 'user').pop();
+
                     return (
-                    <div key={msg.id} className={`flex flex-col ${msg.sender === 'user' ? 'items-end' : 'items-start'}`}>
+                    <div 
+                      key={msg.id} 
+                      id={msg.sender === 'user' ? `user-msg-${msg.id}` : `agent-msg-${msg.id}`} 
+                      className={`flex flex-col scroll-mt-6 ${msg.sender === 'user' ? 'items-end' : 'items-start'}`}
+                    >
                       {msg.sender === 'user' ? (
                         <div className="bg-gradient-to-br from-[var(--color-bg-tertiary)] to-[var(--color-bg-primary)] border border-white/5 text-gray-100 px-5 py-3 rounded-2xl rounded-tr-sm max-w-[85%] text-[13.5px] shadow-md shadow-black/20 animate-in fade-in slide-in-from-right-4 duration-500 hover:shadow-lg transition-all relative overflow-hidden group">
                           <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
@@ -967,37 +1179,110 @@ export default function ChatInterface({ agent }: ChatInterfaceProps) {
                         </div>
                       ) : (
                         <div className="w-full animate-in fade-in duration-300">
-                          <div className="flex items-center justify-between mb-2 px-1">
+                          {/* Response Navigation Header */}
+                          <div className="flex items-center justify-between mb-2 px-1 gap-2 flex-wrap">
                             <div className="flex items-center gap-2">
                               <div className={`w-7 h-7 rounded-lg ${msgAgentTheme.iconBg} border border-white/10 flex items-center justify-center shadow-sm`}>
-                                <Bot size={16} className={msgAgentTheme.iconText} />
+                                <meta.Icon size={14} className={msgAgentTheme.iconText} />
                               </div>
                               <span className={`text-[11px] font-bold ${msgAgentTheme.text} uppercase tracking-wider`}>{msg.senderName}</span>
-                            </div>
-                            <button
-                              onClick={() => {
-                                const cleanText = msg.text.replace(/===DETAILS===[\s\S]*$/, '').trim();
-                                navigator.clipboard.writeText(cleanText);
-                                setCopiedMsgId(msg.id);
-                                setTimeout(() => setCopiedMsgId(null), 2000);
-                              }}
-                              className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition-all text-[11px] cursor-pointer border border-white/5"
-                              title="Copy response to clipboard"
-                            >
-                              {copiedMsgId === msg.id ? (
-                                <>
-                                  <CheckCircle2 size={11} className="text-emerald-400" />
-                                  <span className="text-emerald-400 text-[10.5px]">Copied</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Copy size={11} />
-                                  <span className="text-[10.5px]">Copy</span>
-                                </>
+
+                              {/* Jump to the Question that asked for this */}
+                              {precedingUserQuery && (
+                                <button
+                                  onClick={() => scrollToUserQuery(`user-msg-${precedingUserQuery.id}`)}
+                                  className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/[0.04] hover:bg-brand-500/15 border border-white/[0.08] hover:border-brand-500/30 text-gray-400 hover:text-brand-300 transition-all text-[10px] cursor-pointer"
+                                  title={`Jump up to Question: "${precedingUserQuery.text.slice(0, 35)}..."`}
+                                >
+                                  <CornerRightUp size={10} className="text-brand-400" />
+                                  <span className="hidden sm:inline">To Question</span>
+                                </button>
                               )}
-                            </button>
+                            </div>
+
+                            {/* Action Tools (Collapse, Focus Reader, Copy) */}
+                            <div className="flex items-center gap-1.5">
+                              {/* Compact / Expand Toggle */}
+                              {isLong && (
+                                <button
+                                  onClick={() => setCollapsedResponses(prev => ({ ...prev, [msg.id]: !prev[msg.id] }))}
+                                  className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition-all text-[10.5px] cursor-pointer border border-white/5"
+                                  title={isCollapsed ? "Expand full message" : "Collapse to preview"}
+                                >
+                                  {isCollapsed ? <ChevronDown size={11} /> : <ChevronUp size={11} />}
+                                  <span>{isCollapsed ? "Expand" : "Collapse"}</span>
+                                </button>
+                              )}
+
+                              {/* Focus / Reader Mode */}
+                              <button
+                                onClick={() => setFocusMessage({ id: msg.id, senderName: msg.senderName, text: msg.text })}
+                                className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition-all text-[10.5px] cursor-pointer border border-white/5"
+                                title="Open full reader view"
+                              >
+                                <Maximize2 size={11} />
+                                <span className="hidden sm:inline">Focus</span>
+                              </button>
+
+                              {/* Copy Response */}
+                              <button
+                                onClick={() => {
+                                  const cleanText = msg.text.replace(/===DETAILS===[\s\S]*$/, '').trim();
+                                  navigator.clipboard.writeText(cleanText);
+                                  setCopiedMsgId(msg.id);
+                                  setTimeout(() => setCopiedMsgId(null), 2000);
+                                }}
+                                className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition-all text-[11px] cursor-pointer border border-white/5"
+                                title="Copy response to clipboard"
+                              >
+                                {copiedMsgId === msg.id ? (
+                                  <>
+                                    <CheckCircle2 size={11} className="text-emerald-400" />
+                                    <span className="text-emerald-400 text-[10.5px]">Copied</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Copy size={11} />
+                                    <span className="text-[10.5px]">Copy</span>
+                                  </>
+                                )}
+                              </button>
+                            </div>
                           </div>
-                          {renderAgentResponse(msg.id, msg.text, msgAgentTheme)}
+
+                          {/* Quick Section Jump Bar (TOC) */}
+                          {headings.length > 1 && (
+                            <div className="flex items-center gap-1.5 overflow-x-auto py-1 px-1 custom-scrollbar text-[10.5px] mb-2 bg-white/[0.02] rounded-lg border border-white/[0.04]">
+                              <span className="text-[9.5px] text-gray-500 font-mono flex items-center gap-1 shrink-0 px-1">
+                                <Compass size={11} className="text-brand-400" /> Sections:
+                              </span>
+                              {headings.map((h, hIdx) => (
+                                <button
+                                  key={hIdx}
+                                  onClick={() => scrollToSection(h.slug)}
+                                  className="px-2 py-0.5 rounded-full bg-white/[0.04] hover:bg-brand-500/20 border border-white/[0.08] hover:border-brand-500/30 text-gray-300 hover:text-brand-300 transition-all shrink-0 cursor-pointer text-[10px] whitespace-nowrap"
+                                >
+                                  {h.title}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Response Body with Smooth Collapse Support */}
+                          <div className={`relative ${isCollapsed ? 'max-h-56 overflow-hidden' : ''}`}>
+                            {renderAgentResponse(msg.id, msg.text, msgAgentTheme)}
+                            {isCollapsed && (
+                              <div 
+                                onClick={() => setCollapsedResponses(prev => ({ ...prev, [msg.id]: false }))}
+                                className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-[#0a0a0f] via-[#0a0a0f]/80 to-transparent flex items-end justify-center pb-2 cursor-pointer group"
+                              >
+                                <span className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-brand-500/20 text-brand-300 border border-brand-500/30 group-hover:bg-brand-500/30 transition-all shadow-lg">
+                                  <ChevronDown size={13} />
+                                  <span>Show Full Response</span>
+                                </span>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       )}
                     </div>
@@ -1008,16 +1293,19 @@ export default function ChatInterface({ agent }: ChatInterfaceProps) {
                       <div className="w-full">
                         <div className="flex items-center gap-2 mb-2 px-1">
                           <div className={`w-7 h-7 rounded-lg ${agentTheme.iconBg} border border-white/10 flex items-center justify-center shadow-sm`}>
-                            <Bot size={16} className={agentTheme.iconText} />
+                            <meta.Icon size={14} className={agentTheme.iconText} />
                           </div>
                           <span className={`text-[11px] font-bold ${agentTheme.text} uppercase tracking-wider`}>
-                            {agent === 'Multi-Agent Hub' ? 'Agents are synthesizing...' : `${agent} is thinking & typing...`}
+                            {agent === 'Multi-Agent Hub' ? 'Agents are synthesizing...' : `${agent} is reasoning...`}
                           </span>
                         </div>
-                        <div className="flex gap-1.5 py-3.5 px-4 bg-[var(--color-bg-tertiary)] border border-[var(--color-border-primary)] rounded-2xl rounded-tl-sm w-fit items-center shadow-sm">
-                          <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                          <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                          <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                        <div className="flex items-center gap-3 py-3 px-4 bg-white/[0.03] border border-white/10 rounded-2xl rounded-tl-sm w-fit shadow-xl backdrop-blur-xl">
+                          <div className="flex gap-1.5 items-center">
+                            <div className="w-2 h-2 bg-brand-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                            <div className="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                            <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                          </div>
+                          <span className="text-[11px] font-mono text-gray-400">Synthesizing intelligence...</span>
                         </div>
                       </div>
                     </div>
@@ -1029,11 +1317,14 @@ export default function ChatInterface({ agent }: ChatInterfaceProps) {
         </div>
 
         {/* Chat Input Area */}
-        <div className="p-4 bg-gradient-to-t from-[var(--color-bg-primary)] via-[var(--color-bg-primary)] to-transparent shrink-0 z-10 w-full relative pt-6">
-          <div className="max-w-4xl mx-auto flex flex-col gap-2 relative">
-            <div className="absolute inset-0 bg-brand-500/10 blur-xl rounded-full opacity-40 -z-10"></div>
+        <div className="px-4 pb-3 pt-1 bg-gradient-to-t from-[#0a0a0f] via-[#0a0a0f]/95 to-transparent shrink-0 z-10 w-full relative">
+          <div className="max-w-4xl mx-auto flex flex-col gap-1 relative">
+            <div 
+              className="absolute inset-0 blur-2xl rounded-full opacity-30 -z-10 transition-opacity pointer-events-none"
+              style={{ background: meta.glowColor }}
+            />
             
-            <div className="flex items-end bg-black/40 backdrop-blur-xl rounded-2xl w-full shadow-2xl border border-white/10 focus-within:border-brand-500/40 focus-within:bg-black/60 transition-all duration-300 overflow-hidden group pl-4">
+            <div className="flex flex-col bg-[#12131c]/90 backdrop-blur-2xl rounded-xl w-full shadow-[0_20px_50px_rgba(0,0,0,0.6),inset_0_1px_1px_rgba(255,255,255,0.1)] border border-white/[0.12] focus-within:border-brand-500/60 focus-within:ring-2 focus-within:ring-brand-500/20 transition-all duration-300 overflow-hidden group p-1.5">
               <textarea
                 value={localQuery}
                 onChange={(e) => setLocalQuery(e.target.value)}
@@ -1043,43 +1334,142 @@ export default function ChatInterface({ agent }: ChatInterfaceProps) {
                     if (localQuery.trim()) handleRunAgent(e as any);
                   }
                 }}
-                placeholder={isRunning ? "Agent is reasoning & generating response..." : `Ask ${agent}...`}
+                placeholder={isRunning ? "Agent is reasoning & generating response..." : `Ask ${agent}... (e.g. Plan project, analyze dependencies)`}
                 disabled={isRunning}
                 rows={1}
-                className="flex-1 bg-transparent text-[13.5px] text-gray-200 outline-none placeholder-gray-500 disabled:opacity-50 py-3.5 resize-none max-h-32 min-h-[50px] custom-scrollbar"
+                className="w-full bg-transparent text-[13px] text-gray-100 outline-none placeholder-gray-500 disabled:opacity-50 px-2.5 py-1.5 resize-none max-h-28 min-h-[40px] custom-scrollbar"
                 autoFocus
                 style={{ height: 'auto' }}
                 onInput={(e) => {
                   const target = e.target as HTMLTextAreaElement;
                   target.style.height = 'auto';
-                  target.style.height = `${Math.min(target.scrollHeight, 128)}px`;
+                  target.style.height = `${Math.min(target.scrollHeight, 112)}px`;
                 }}
               />
 
-              <button
-                onClick={handleRunAgent}
-                disabled={isRunning || !localQuery.trim()}
-                className={`p-2.5 m-1.5 rounded-xl flex items-center justify-center transition-all duration-300 flex-shrink-0 cursor-pointer ${
-                  isRunning ? 'bg-brand-500/20 text-brand-500' : 
-                  !localQuery.trim() ? 'bg-white/5 text-gray-500 cursor-not-allowed' :
-                  'bg-brand-500 hover:bg-brand-400 hover:shadow-lg hover:shadow-brand-500/25 hover:-translate-y-0.5 text-white shadow-sm'
-                }`}
-                title="Send message"
-              >
-                {isRunning ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} className="ml-0.5" />}
-              </button>
+              <div className="flex items-center justify-between pt-1 px-1.5 border-t border-white/[0.04]">
+                <div className="flex items-center gap-2 text-[11px] text-gray-500">
+                  <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-white/[0.03] border border-white/[0.06] text-gray-400 font-mono text-[9.5px]">
+                    <Sparkles size={10} className={meta.textColor} />
+                    <span>Autonomous Mode</span>
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="hidden sm:inline-block text-[9.5px] text-gray-500 font-mono">
+                    <kbd className="px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-gray-400">↵ Enter</kbd> to send
+                  </span>
+                  <button
+                    onClick={handleRunAgent}
+                    disabled={isRunning || !localQuery.trim()}
+                    className={`px-3 py-1 rounded-lg flex items-center gap-1.5 transition-all duration-300 flex-shrink-0 cursor-pointer font-medium text-xs ${
+                      isRunning ? 'bg-brand-500/20 text-brand-400' : 
+                      !localQuery.trim() ? 'bg-white/5 text-gray-500 cursor-not-allowed' :
+                      'bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white shadow-[0_0_15px_rgba(124,58,237,0.4)] hover:shadow-[0_0_25px_rgba(124,58,237,0.6)] hover:scale-105 active:scale-95'
+                    }`}
+                    title="Send message"
+                  >
+                    {isRunning ? (
+                      <>
+                        <Loader2 size={13} className="animate-spin" />
+                        <span>Thinking...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>Send</span>
+                        <Send size={12} />
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
             </div>
             
-            <div className="flex items-center justify-between text-[10.5px] text-gray-500 px-2">
-              <span className="flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" />
-                Advanced LLM Intelligence Active
-              </span>
-              <span>AI can make mistakes. Verify important information.</span>
+            <div className="flex items-center justify-center text-[10px] text-gray-500 px-2 mt-0.5">
+              <span>MARE can make mistakes. Verify important information.</span>
             </div>
           </div>
         </div>
       </div>
+
+        {/* Floating Quick Navigation Dock */}
+        {hasMessages && (showScrollTop || showScrollBottom) && (
+          <div className="absolute right-5 bottom-20 z-30 flex items-center gap-1 bg-[#12131d]/90 backdrop-blur-xl border border-white/10 rounded-full p-1 shadow-2xl animate-in fade-in slide-in-from-bottom-2 duration-200">
+            {showScrollTop && (
+              <button
+                onClick={scrollToTop}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] text-gray-300 hover:text-white bg-white/5 hover:bg-white/10 transition-colors cursor-pointer"
+                title="Jump to Top / First Question"
+              >
+                <ArrowUp size={12} className="text-brand-400" />
+                <span className="font-mono text-[10px]">Top</span>
+              </button>
+            )}
+            {showScrollBottom && (
+              <button
+                onClick={scrollToBottom}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] text-white bg-brand-600/60 hover:bg-brand-600 border border-brand-500/40 transition-all cursor-pointer shadow-[0_0_10px_rgba(139,92,246,0.3)] animate-pulse"
+                title="Jump to Latest Response"
+              >
+                <span className="font-mono text-[10px]">Latest</span>
+                <ArrowDown size={12} />
+              </button>
+            )}
+          </div>
+        )}
+
+      {/* Reader / Focus Mode Modal */}
+      {focusMessage && (
+        <div 
+          className="fixed inset-0 bg-black/80 backdrop-blur-md z-[200] flex items-center justify-center p-4 sm:p-8 animate-in fade-in duration-200"
+          onClick={() => setFocusMessage(null)}
+        >
+          <div 
+            className="bg-[#0e0f17] border border-white/15 rounded-2xl shadow-[0_25px_70px_rgba(0,0,0,0.8)] max-w-4xl w-full h-[85vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-white/[0.02]">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-xl bg-brand-500/10 border border-brand-500/20 flex items-center justify-center text-brand-400">
+                  <meta.Icon size={16} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-white tracking-wide">{focusMessage.senderName} • Focus Reader</h3>
+                  <p className="text-[11px] text-gray-400">Full wide reading view with no split-pane scrolling</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    const cleanText = focusMessage.text.replace(/===DETAILS===[\s\S]*$/, '').trim();
+                    navigator.clipboard.writeText(cleanText);
+                    setCopiedMsgId('focus-modal');
+                    setTimeout(() => setCopiedMsgId(null), 2000);
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-xs text-gray-300 hover:text-white transition-all border border-white/10 cursor-pointer"
+                >
+                  {copiedMsgId === 'focus-modal' ? <CheckCircle2 size={13} className="text-emerald-400" /> : <Copy size={13} />}
+                  <span>{copiedMsgId === 'focus-modal' ? 'Copied' : 'Copy All'}</span>
+                </button>
+                <button
+                  onClick={() => setFocusMessage(null)}
+                  className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                  title="Close Reader"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Content */}
+            <div className="flex-1 overflow-y-auto p-6 sm:p-8 custom-scrollbar text-[14px] leading-relaxed text-gray-200">
+              {formatMarkdown(focusMessage.text.split('===DETAILS===')[0].trim(), agentTheme)}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Save Popup */}
       {showSavePopup && (

@@ -222,24 +222,30 @@ export default function CodeEditor({ agent }: CodeEditorProps) {
 
   return (
     <div
-      className={`flex flex-1 flex-col rounded-xl border bg-[#1e1e1e] overflow-hidden shadow-lg mx-1 min-w-[300px] transition-all ${isActive ? 'border-brand-500/50 ring-1 ring-brand-500/20' : 'border-[var(--color-border-primary)] opacity-90'}`}
+      className={`flex flex-1 flex-col rounded-2xl border bg-[#0a0a0f]/95 backdrop-blur-2xl overflow-hidden shadow-2xl mx-1 min-w-[300px] transition-all duration-300 ${
+        isActive 
+          ? 'border-brand-500/40 ring-1 ring-brand-500/20 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.8)]' 
+          : 'border-white/[0.07] opacity-95 hover:border-white/15'
+      }`}
       onClick={() => setActiveAgent(agent)}
     >
-      <div className="flex items-center justify-between border-b border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] px-4 py-3 text-sm">
-        <div className={`flex items-center gap-3 text-white border-b-2 pb-2 -mb-3 transition-colors ${isActive ? 'border-brand-500' : 'border-transparent'}`}>
-          <Code size={16} className={isActive ? 'text-brand-400' : 'text-text-tertiary'} />
-          <span className="font-medium">{agent}</span>
+      <div className="flex items-center justify-between border-b border-white/[0.07] bg-black/40 backdrop-blur-xl px-4 py-3 text-sm">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shadow-inner">
+            <Code size={16} />
+          </div>
+          <span className="font-semibold text-[13.5px] text-white tracking-tight">{agent}</span>
           
-          <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 ml-1">
+          <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9.5px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            <span>MARE</span>
+            <span className="font-mono">MARE</span>
           </span>
         </div>
         
-        <div className="flex items-center gap-3.5 pb-2 -mb-3 text-gray-400">
+        <div className="flex items-center gap-1.5 text-gray-400">
           <button
             onClick={handleSave}
-            className="flex items-center justify-center text-text-tertiary hover:text-accent-blue transition-colors cursor-pointer"
+            className="p-2 rounded-lg hover:bg-white/[0.08] hover:text-white transition-all cursor-pointer border border-transparent hover:border-white/10"
             title="Save to File System"
           >
             <Save size={15} />
@@ -248,18 +254,20 @@ export default function CodeEditor({ agent }: CodeEditorProps) {
           <button
             onClick={handleRunAgent}
             disabled={isRunning}
-            className={`flex items-center justify-center transition-colors ${isRunning ? 'text-brand-500 cursor-not-allowed opacity-50' : 'text-text-tertiary hover:text-accent-green cursor-pointer'}`}
+            className={`p-2 rounded-lg transition-all border border-transparent ${isRunning ? 'text-brand-500 cursor-not-allowed opacity-50' : 'hover:bg-emerald-500/10 hover:text-emerald-400 hover:border-emerald-500/20 cursor-pointer'}`}
             title="Run this agent"
           >
             <Play size={14} fill={isRunning ? "currentColor" : "none"} />
           </button>
           
+          <div className="w-px h-4 bg-white/10 mx-1" />
+
           <button
             onClick={(e) => { e.stopPropagation(); removeOpenAgent(agent); }}
-            className="cursor-pointer text-text-tertiary hover:text-accent-red transition-colors"
+            className="p-2 rounded-lg hover:bg-red-500/15 hover:text-red-400 hover:border-red-500/20 transition-all cursor-pointer border border-transparent"
             title="Close"
           >
-            <X size={16} />
+            <X size={15} />
           </button>
         </div>
       </div>

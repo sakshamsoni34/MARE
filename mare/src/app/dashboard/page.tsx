@@ -193,7 +193,6 @@ export default function Dashboard() {
                   {openAgents.length === 0 ? (
                     <div className="flex-1 flex flex-col items-center justify-center h-full w-full select-none">
                       <img src="/logo.png?v=2" alt="MARE Logo" className="w-[500px] max-w-[80%] pointer-events-none" />
-                      <p className="text-text-tertiary text-xs mt-3 tracking-wide">Select an agent from the sidebar to start collaborating</p>
                     </div>
                   ) : (
                     openAgents.map((agent, index) => (

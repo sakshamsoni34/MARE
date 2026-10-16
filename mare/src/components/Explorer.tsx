@@ -283,11 +283,7 @@ export default function Explorer() {
           {activeProject ? (
             <>
               {renderInput(null, 0)}
-              {fileSystem.length === 0 ? (
-                <div className="p-4 text-xs text-text-tertiary text-center">Empty folder</div>
-              ) : (
-                fileSystem.map(node => renderNode(node, 0))
-              )}
+              {fileSystem.map(node => renderNode(node, 0))}
             </>
           ) : null}
         </div>

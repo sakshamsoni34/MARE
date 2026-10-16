@@ -10,14 +10,13 @@ import {
   Activity, 
   Folder, 
   Cog, 
-  Network, 
-  Users
+  Network
 } from 'lucide-react';
 import { useStore, Agent } from '@/store/useStore';
 import Explorer from '@/components/Explorer';
 import { motion, AnimatePresence } from 'framer-motion';
 
-type ActivityTab = 'Explorer' | 'Hub' | 'Planning' | 'Research' | 'Execution' | 'Analysis' | 'Reporting' | 'Monitoring' | 'Projects' | 'Settings';
+type ActivityTab = 'Explorer' | 'Planning' | 'Research' | 'Execution' | 'Analysis' | 'Reporting' | 'Monitoring' | 'Projects' | 'Settings';
 
 const ActivityIcon = ({ icon, label, isActive, onClick }: any) => (
   <div
@@ -127,18 +126,6 @@ export default function Sidebar() {
     switch(activeTab) {
       case 'Explorer':
         return <Explorer />;
-      case 'Hub':
-        return (
-          <div className="flex flex-col gap-1 py-1">
-            <CategoryHeader title="Orchestration Hub" count={1} />
-            <AgentItem 
-              agent="Multi-Agent Hub" 
-              displayName="Multi-Agent Hub"
-              activeAgent={activeAgent} 
-              handleAgentClick={handleAgentClick}
-            />
-          </div>
-        );
       case 'Planning':
         return (
           <div className="flex flex-col gap-1 py-1">
@@ -358,7 +345,6 @@ export default function Sidebar() {
         {/* Activity Bar */}
         <aside className="w-14 shrink-0 bg-[#050505] flex flex-col items-center py-3 h-full border-r border-white/5 z-10 relative">
           <ActivityIcon icon={<Home size={20} strokeWidth={1.5} />} label="Explorer" isActive={activeTab === 'Explorer'} onClick={() => handleTabClick('Explorer')} />
-          <ActivityIcon icon={<Users size={20} strokeWidth={1.5} />} label="Multi-Agent Hub" isActive={activeTab === 'Hub'} onClick={() => handleTabClick('Hub')} />
           <ActivityIcon icon={<BrainCircuit size={20} strokeWidth={1.5} />} label="Planning" isActive={activeTab === 'Planning'} onClick={() => handleTabClick('Planning')} />
           <ActivityIcon icon={<Search size={20} strokeWidth={1.5} />} label="Research" isActive={activeTab === 'Research'} onClick={() => handleTabClick('Research')} />
           <ActivityIcon icon={<Cog size={20} strokeWidth={1.5} />} label="Execution" isActive={activeTab === 'Execution'} onClick={() => handleTabClick('Execution')} />
