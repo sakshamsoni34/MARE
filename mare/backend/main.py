@@ -24,6 +24,15 @@ from models import (
     WorkflowExecuteRequest
 )
 from mistral_service import generate_mistral_stream
+from security_system import (
+    CodeSecurityGuard,
+    PromptSecurityGuard,
+    PathSecurityGuard,
+    SecretScrubber,
+    SecurityPerimeterMiddleware,
+    auditor,
+    rate_limiter
+)
 
 load_dotenv()
 load_dotenv("../.env")
@@ -44,11 +53,14 @@ else:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     app.state.client = httpx.AsyncClient()
-    logger.info("MARE Multi-Agent LLM Platform backend initialized.")
+    logger.info("MARE Multi-Agent LLM Platform backend initialized with Autonomous Security System.")
     yield
     await app.state.client.aclose()
 
 app = FastAPI(lifespan=lifespan, title="MARE Multi-Agent Advanced LLM Platform API")
+
+# Autonomous Backend Security Perimeter Middleware (OWASP headers, secret scrubbing, rate-limiting)
+app.add_middleware(SecurityPerimeterMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
@@ -69,16 +81,31 @@ def get_client(request: Request) -> httpx.AsyncClient:
 # ----------------- AGENT CHAT & STREAMING -----------------
 
 @app.post("/api/agent")
-async def handle_agent_request(body: AgentRequest, client: httpx.AsyncClient = Depends(get_client)):
+async def handle_agent_request(body: AgentRequest, request: Request, client: httpx.AsyncClient = Depends(get_client)):
+    client_ip = request.client.host if request.client else "127.0.0.1"
+
+    # 1. Prompt Injection & Adversarial Attack Defense Layer
+    clean_query, clean_system_prompt, was_adversarial = PromptSecurityGuard.inspect_and_sanitize(
+        user_query=body.userQuery,
+        system_prompt=body.systemPrompt or "",
+        client_ip=client_ip
+    )
+
     current_key = os.getenv("MISTRAL_API_KEY", "")
-    return StreamingResponse(
-        generate_mistral_stream(
+
+    # 2. Secret Scrubber Stream Wrapper to guarantee zero credential leak
+    async def secured_stream():
+        async for chunk in generate_mistral_stream(
             client=client, 
             agent_name=body.agentName, 
-            system_prompt_from_ui=body.systemPrompt or "", 
-            user_query=body.userQuery, 
+            system_prompt_from_ui=clean_system_prompt, 
+            user_query=clean_query, 
             mistral_api_key=current_key
-        ),
+        ):
+            yield SecretScrubber.scrub_bytes(chunk)
+
+    return StreamingResponse(
+        secured_stream(),
         media_type="text/event-stream"
     )
 
@@ -94,8 +121,22 @@ async def handle_ui_event(body: UIEventRequest):
     })
 
 @app.post("/api/sync/file")
-async def sync_file(body: SyncFileRequest):
-    return JSONResponse(content={"status": "success", "message": f"File '{body.name}' registered.", "timestamp": datetime.now(timezone.utc).isoformat()})
+async def sync_file(body: SyncFileRequest, request: Request):
+    client_ip = request.client.host if request.client else "127.0.0.1"
+
+    # Validate filename against directory traversal & dangerous executables
+    is_valid, reason = PathSecurityGuard.validate_filename(body.name, client_ip)
+    if not is_valid:
+        return JSONResponse(
+            status_code=400, 
+            content={"status": "error", "message": f"Security Policy Violation: {reason}"}
+        )
+
+    return JSONResponse(content={
+        "status": "success", 
+        "message": f"File '{body.name}' registered safely.", 
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    })
 
 @app.post("/api/sync/conversation")
 async def sync_conversation(body: SyncConversationRequest):
@@ -134,51 +175,50 @@ async def get_state():
 
 @app.post("/api/projects")
 async def create_project(body: ProjectCreateRequest):
-    return JSONResponse(content={"status": "success", "message": f"Project '{body.name}' created."})
+    clean_name = PathSecurityGuard.sanitize_identifier(body.name)
+    if not clean_name:
+        return JSONResponse(status_code=400, content={"status": "error", "message": "Invalid or unsafe project name."})
+    return JSONResponse(content={"status": "success", "message": f"Project '{clean_name}' created."})
 
 @app.delete("/api/projects/{name}")
 async def delete_project(name: str):
-    return JSONResponse(content={"status": "success", "message": f"Project '{name}' deleted."})
+    clean_name = PathSecurityGuard.sanitize_identifier(name)
+    if not clean_name:
+        return JSONResponse(status_code=400, content={"status": "error", "message": "Invalid or unsafe project name."})
+    return JSONResponse(content={"status": "success", "message": f"Project '{clean_name}' deleted."})
 
 # ----------------- CODE EXECUTION & WORKFLOW -----------------
 
 @app.post("/api/execute/code")
-async def execute_code(body: ExecuteCodeRequest):
-    """Safely execute Python code in a local subprocess and return stdout, stderr, and execution duration."""
-    start_time = time.time()
-    try:
-        process = subprocess.run(
-            [sys.executable, "-c", body.code],
-            capture_output=True,
-            text=True,
-            timeout=body.timeout or 10
-        )
-        duration_ms = round((time.time() - start_time) * 1000, 2)
-        return JSONResponse(content={
-            "status": "success" if process.returncode == 0 else "error",
-            "stdout": process.stdout,
-            "stderr": process.stderr,
-            "returncode": process.returncode,
-            "duration_ms": duration_ms
-        })
-    except subprocess.TimeoutExpired:
-        duration_ms = round((time.time() - start_time) * 1000, 2)
-        return JSONResponse(content={
-            "status": "timeout",
-            "stdout": "",
-            "stderr": f"Execution timed out after {body.timeout} seconds.",
-            "returncode": -1,
-            "duration_ms": duration_ms
-        })
-    except Exception as e:
-        duration_ms = round((time.time() - start_time) * 1000, 2)
-        return JSONResponse(content={
+async def execute_code(body: ExecuteCodeRequest, request: Request):
+    """
+    Safely execute Python code using the backend AST Security Inspector
+    and sandboxed execution subprocess with stripped credentials.
+    """
+    client_ip = request.client.host if request.client else "127.0.0.1"
+
+    # Anti-abuse rate limiting check
+    if not rate_limiter.is_code_exec_allowed(client_ip):
+        return JSONResponse(status_code=429, content={
             "status": "error",
             "stdout": "",
-            "stderr": str(e),
+            "stderr": "Security Exception: Code execution rate limit exceeded. Please wait before executing again.",
             "returncode": -1,
-            "duration_ms": duration_ms
+            "duration_ms": 0.0
         })
+
+    # AST verification, environment sanitization & sandboxed execution
+    execution_result = CodeSecurityGuard.execute_sandboxed(
+        code=body.code,
+        timeout=body.timeout or 10,
+        client_ip=client_ip
+    )
+    return JSONResponse(content=execution_result)
+
+@app.get("/api/security/audit")
+async def get_security_audit():
+    """Internal backend telemetry endpoint for querying security status and blocked threats."""
+    return JSONResponse(content=auditor.get_summary())
 
 @app.post("/api/workflow/execute")
 async def execute_workflow(body: WorkflowExecuteRequest):

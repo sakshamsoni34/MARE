@@ -44,6 +44,7 @@ export default function Dashboard() {
   } = useStore();
 
   const [workflowWidth, setWorkflowWidth] = useState(500);
+  const [rightSidebarWidth, setRightSidebarWidth] = useState(420);
   const [isAgentDropdownOpen, setIsAgentDropdownOpen] = useState(false);
   const [agentWidths, setAgentWidths] = useState<Record<string, number>>({});
 
@@ -264,9 +265,32 @@ export default function Dashboard() {
               {isTerminalOpen && <TerminalOutput />}
             </main>
             {isRightSidebarOpen && (
-              <div className="w-[400px] flex-shrink-0 flex flex-col border-l border-[var(--color-border-primary)] bg-[var(--color-bg-primary)] p-2">
-                <ChatInterface agent="Orqion" />
-              </div>
+              <>
+                <div
+                  className="w-1.5 cursor-col-resize hover:bg-violet-500/50 bg-transparent transition-colors flex-shrink-0 z-10 rounded-full my-2"
+                  title="Drag to resize Orqion panel"
+                  onMouseDown={(e) => {
+                    const startX = e.clientX;
+                    const startWidth = rightSidebarWidth;
+
+                    const onMouseMove = (moveEvent: MouseEvent) => {
+                      const newWidth = Math.max(340, Math.min(800, startWidth - (moveEvent.clientX - startX)));
+                      setRightSidebarWidth(newWidth);
+                    };
+
+                    const onMouseUp = () => {
+                      document.removeEventListener('mousemove', onMouseMove);
+                      document.removeEventListener('mouseup', onMouseUp);
+                    };
+
+                    document.addEventListener('mousemove', onMouseMove);
+                    document.addEventListener('mouseup', onMouseUp);
+                  }}
+                />
+                <div style={{ width: rightSidebarWidth }} className="flex-shrink-0 flex flex-col border-l border-[var(--color-border-primary)] bg-[var(--color-bg-primary)] p-2">
+                  <ChatInterface agent="Orqion" />
+                </div>
+              </>
             )}
           </div>
         </div>

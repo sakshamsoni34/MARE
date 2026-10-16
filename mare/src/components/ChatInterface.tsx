@@ -31,7 +31,12 @@ import {
   CornerRightUp,
   ChevronDown,
   ChevronUp,
-  Compass
+  Compass,
+  FolderPlus,
+  Network,
+  Workflow,
+  Cpu,
+  Orbit
 } from 'lucide-react';
 import { useStore, Agent, FileSystemNode } from '@/store/useStore';
 import { useSession } from 'next-auth/react';
@@ -240,6 +245,18 @@ const getAgentMeta = (agentName: string) => {
       borderColor: 'border-blue-500/30'
     };
   }
+  if (agentName === 'Orqion') {
+    return {
+      Icon: Orbit,
+      category: 'Autonomous Multi-Agent Core',
+      badge: 'Orqion v2.5 Quantum Engine',
+      chips: ['Autonomous Workspace Control', 'Multi-Agent Mesh Routing', 'Dynamic DAG Synthesis', 'Secure AST Sandbox'],
+      accentGradient: 'from-violet-500 via-fuchsia-500 to-cyan-400',
+      glowColor: 'rgba(168, 85, 247, 0.35)',
+      textColor: 'text-violet-300',
+      borderColor: 'border-violet-500/30'
+    };
+  }
   return {
     Icon: Zap,
     category: 'Autonomous Multi-Agent Core',
@@ -419,9 +436,24 @@ const renderTextAndTables = (textBlock: string, agentTheme: any, keyPrefix: numb
       continue;
     }
 
-    // Blockquote
+    // Blockquote and Orqion Action Cards
     if (line.trim().startsWith('>')) {
       const quoteText = line.trim().replace(/^>\s?/, '');
+      if (quoteText.includes('[Action executed successfully by Orqion]')) {
+        elements.push(
+          <div key={`${keyPrefix}-action-${i}`} className="my-2.5 p-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 backdrop-blur-md flex items-center gap-3 text-emerald-300 shadow-sm animate-in fade-in duration-300">
+            <div className="w-7 h-7 rounded-lg bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center shrink-0">
+              <CheckCircle2 size={15} className="text-emerald-400" />
+            </div>
+            <div className="flex flex-col min-w-0">
+              <span className="text-[10px] font-mono font-bold tracking-wider uppercase text-emerald-400">Workspace Action Executed</span>
+              <span className="text-[12.5px] text-gray-200 font-medium">Orqion executed requested workspace modifications successfully.</span>
+            </div>
+          </div>
+        );
+        i++;
+        continue;
+      }
       elements.push(
         <div key={`${keyPrefix}-quote-${i}`} className={`border-l-2 ${agentTheme.border} pl-3.5 py-1.5 my-2.5 text-gray-300/90 italic ${agentTheme.bg} rounded-r-lg text-[13px]`}>
           <span dangerouslySetInnerHTML={{ __html: formatInline(quoteText, agentTheme) }}></span>
@@ -1005,84 +1037,108 @@ export default function ChatInterface({ agent }: ChatInterfaceProps) {
         <div
           ref={scrollRef}
           onScroll={handleChatScroll}
-          className={`w-full flex-1 p-3 text-gray-300 font-sans text-sm whitespace-pre-wrap break-words custom-scrollbar flex flex-col ${
-            hasMessages ? 'overflow-y-auto' : 'overflow-hidden justify-center'
-          }`}
+          className="w-full flex-1 p-3 text-gray-300 font-sans text-sm whitespace-pre-wrap break-words custom-scrollbar flex flex-col overflow-y-auto"
           style={{ fontFamily: "Inter, sans-serif", lineHeight: 1.6 }}
         >
           {!hasMessages ? (
-            <div className="flex flex-col items-center justify-center max-w-3xl mx-auto w-full relative z-10 animate-in fade-in duration-300 my-auto py-4 px-4">
-              
-              {/* Emblem Badge */}
-              <div className="relative flex items-center justify-center mb-4 group">
-                <div 
-                  className="absolute -inset-3 rounded-3xl blur-2xl opacity-60 group-hover:opacity-100 transition-opacity duration-700 animate-pulse pointer-events-none"
-                  style={{ background: `radial-gradient(circle, ${meta.glowColor} 0%, transparent 70%)` }}
-                />
-                <div className="relative w-16 h-16 rounded-2xl bg-gradient-to-b from-white/10 to-white/[0.02] border border-white/20 backdrop-blur-xl flex items-center justify-center shadow-[0_8px_32px_rgba(0,0,0,0.6),inset_0_1px_1px_rgba(255,255,255,0.3)] group-hover:scale-105 transition-transform duration-300">
-                  <meta.Icon size={30} className={meta.textColor} />
-                  <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-emerald-500 border-2 border-[#0a0a0f] flex items-center justify-center">
-                    <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
+            agent === 'Orqion' ? (
+              <div className="flex flex-col items-center justify-center max-w-md mx-auto w-full relative z-10 animate-in fade-in duration-300 my-auto py-12 px-4 text-center select-none">
+                {/* Minimalist Glowing Orqion Emblem */}
+                <div className="relative flex flex-col items-center justify-center mb-6 group">
+                  <div 
+                    className="absolute -inset-6 rounded-full blur-3xl opacity-40 group-hover:opacity-75 transition-opacity duration-700 pointer-events-none"
+                    style={{ background: 'radial-gradient(circle, rgba(168, 85, 247, 0.45) 0%, rgba(59, 130, 246, 0.25) 50%, transparent 75%)' }}
+                  />
+                  <div className="relative w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-500/20 via-[#161724] to-[#0c0d16] border border-violet-500/30 backdrop-blur-2xl flex items-center justify-center shadow-[0_12px_40px_rgba(0,0,0,0.6),inset_0_1px_2px_rgba(255,255,255,0.2)] group-hover:scale-105 transition-all duration-300">
+                    <Orbit size={32} className="text-violet-300 drop-shadow-[0_0_10px_rgba(168,85,247,0.6)]" />
+                    <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-emerald-400 border-2 border-[#0a0a0f] flex items-center justify-center shadow-[0_0_8px_#34d399]">
+                      <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
+                    </div>
                   </div>
                 </div>
+
+                {/* Clean, Elegant Greeting */}
+                <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-white mb-2.5">
+                  What would you like to build?
+                </h1>
+                
+                <p className="text-gray-400 text-[13px] leading-relaxed max-w-xs mb-2">
+                  Ask Orqion to create files, coordinate agents, write code, or architect workflows in your workspace.
+                </p>
               </div>
-
-              {/* Agent Title */}
-              <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-center mb-2.5 bg-gradient-to-r from-white via-zinc-100 to-zinc-400 bg-clip-text text-transparent">
-                {agent}
-              </h1>
-
-              {/* Description */}
-              <p className="text-gray-400 text-center max-w-lg mb-8 text-[13.5px] leading-relaxed">
-                {AGENT_CONFIGS[agent]?.description || "How can I assist you with your tasks today?"}
-              </p>
-
-              {/* Interactive Prompt Cards */}
-              {AGENT_CONFIGS[agent]?.prompts && agent !== 'Multi-Agent Hub' && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 w-full">
-                  {AGENT_CONFIGS[agent].prompts.map((prompt, i) => (
-                    <button
-                      key={i}
-                      onClick={() => setLocalQuery(prompt)}
-                      className="text-left px-5 py-4 rounded-2xl border border-white/[0.08] bg-gradient-to-br from-white/[0.035] to-white/[0.01] hover:from-white/[0.07] hover:to-white/[0.02] hover:border-brand-500/40 hover:-translate-y-1 transition-all duration-200 text-gray-300 flex items-center justify-between gap-4 group relative overflow-hidden shadow-sm hover:shadow-[0_8px_30px_rgba(139,92,246,0.15)] cursor-pointer"
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <span className="text-[10px] font-mono font-bold text-gray-500 group-hover:text-brand-400 uppercase tracking-wider px-2 py-0.5 rounded-md bg-white/5 border border-white/5 shrink-0">
-                          0{i + 1}
-                        </span>
-                        <span className="text-[13px] text-gray-200 group-hover:text-white font-medium leading-snug">
-                          {prompt}
-                        </span>
-                      </div>
-                      <div className="w-6 h-6 rounded-lg bg-white/5 group-hover:bg-brand-500/20 flex items-center justify-center text-gray-400 group-hover:text-brand-300 shrink-0 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5">
-                        <ArrowUpRight size={13} />
-                      </div>
-                    </button>
-                  ))}
+            ) : (
+              <div className="flex flex-col items-center justify-center max-w-xl mx-auto w-full relative z-10 animate-in fade-in duration-300 my-auto py-4 px-3">
+                {/* Emblem Badge */}
+                <div className="relative flex items-center justify-center mb-3 group">
+                  <div 
+                    className="absolute -inset-3 rounded-3xl blur-2xl opacity-60 group-hover:opacity-100 transition-opacity duration-700 animate-pulse pointer-events-none"
+                    style={{ background: `radial-gradient(circle, ${meta.glowColor} 0%, transparent 70%)` }}
+                  />
+                  <div className="relative w-14 h-14 rounded-2xl bg-gradient-to-b from-white/10 to-white/[0.02] border border-white/20 backdrop-blur-xl flex items-center justify-center shadow-[0_8px_32px_rgba(0,0,0,0.6),inset_0_1px_1px_rgba(255,255,255,0.3)] group-hover:scale-105 transition-transform duration-300">
+                    <meta.Icon size={26} className={meta.textColor} />
+                    <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-[#0a0a0f] flex items-center justify-center">
+                      <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
+                    </div>
+                  </div>
                 </div>
-              )}
 
-              {agent === 'Multi-Agent Hub' && (
-                <div className="w-full mt-6 mb-4 max-w-2xl">
-                  <h3 className="text-gray-300 text-sm font-medium mb-4 text-center">Select Collaborating Agents</h3>
-                  <div className="flex flex-wrap justify-center gap-2">
-                    {Object.keys(AGENT_CONFIGS).filter(a => a !== 'Orqion' && a !== 'Multi-Agent Hub').map(a => (
+                {/* Agent Title */}
+                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-center mb-2 bg-gradient-to-r from-white via-zinc-100 to-zinc-400 bg-clip-text text-transparent">
+                  {agent}
+                </h1>
+
+                {/* Description */}
+                <p className="text-gray-400 text-center max-w-md mb-6 text-[13px] leading-relaxed">
+                  {AGENT_CONFIGS[agent]?.description || "How can I assist you with your tasks today?"}
+                </p>
+
+                {/* Interactive Prompt Cards */}
+                {AGENT_CONFIGS[agent]?.prompts && agent !== 'Multi-Agent Hub' && (
+                  <div className="flex flex-col gap-2.5 w-full">
+                    {AGENT_CONFIGS[agent].prompts.map((prompt, i) => (
                       <button
-                        key={a}
-                        onClick={() => toggleHubSelectedAgent(a as Agent)}
-                        className={`px-3 py-1.5 rounded-full text-[12px] transition-all border cursor-pointer ${
-                          hubSelectedAgents.includes(a as Agent)
-                            ? 'bg-brand-500/20 border-brand-500/50 text-brand-400 font-medium'
-                            : 'bg-[var(--color-bg-primary)] border-[var(--color-border-primary)] text-gray-400 hover:border-gray-500 hover:text-gray-300'
-                        }`}
+                        key={i}
+                        onClick={() => setLocalQuery(prompt)}
+                        className="text-left px-4 py-3 rounded-xl border border-white/[0.08] bg-gradient-to-br from-white/[0.035] to-white/[0.01] hover:from-white/[0.07] hover:to-white/[0.02] hover:border-brand-500/40 hover:-translate-y-0.5 transition-all duration-200 text-gray-300 flex items-center justify-between gap-3 group relative overflow-hidden shadow-sm hover:shadow-[0_8px_30px_rgba(139,92,246,0.15)] cursor-pointer w-full"
                       >
-                        {a.replace(' Agent', '')}
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                          <span className="text-[10px] font-mono font-bold text-gray-500 group-hover:text-brand-400 uppercase tracking-wider px-2 py-0.5 rounded-md bg-white/5 border border-white/5 shrink-0">
+                            0{i + 1}
+                          </span>
+                          <span className="text-[12.5px] text-gray-200 group-hover:text-white font-medium leading-snug truncate">
+                            {prompt}
+                          </span>
+                        </div>
+                        <div className="w-6 h-6 rounded-lg bg-white/5 group-hover:bg-brand-500/20 flex items-center justify-center text-gray-400 group-hover:text-brand-300 shrink-0 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5">
+                          <ArrowUpRight size={13} />
+                        </div>
                       </button>
                     ))}
                   </div>
-                </div>
-              )}
-            </div>
+                )}
+
+                {agent === 'Multi-Agent Hub' && (
+                  <div className="w-full mt-6 mb-4 max-w-2xl">
+                    <h3 className="text-gray-300 text-sm font-medium mb-4 text-center">Select Collaborating Agents</h3>
+                    <div className="flex flex-wrap justify-center gap-2">
+                      {Object.keys(AGENT_CONFIGS).filter(a => a !== 'Orqion' && a !== 'Multi-Agent Hub').map(a => (
+                        <button
+                          key={a}
+                          onClick={() => toggleHubSelectedAgent(a as Agent)}
+                          className={`px-3 py-1.5 rounded-full text-[12px] transition-all border cursor-pointer ${
+                            hubSelectedAgents.includes(a as Agent)
+                              ? 'bg-brand-500/20 border-brand-500/50 text-brand-400 font-medium'
+                              : 'bg-[var(--color-bg-primary)] border-[var(--color-border-primary)] text-gray-400 hover:border-gray-500 hover:text-gray-300'
+                          }`}
+                        >
+                          {a.replace(' Agent', '')}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )
           ) : (
             (() => {
               const renderAgentResponse = (msgId: string, text: string, msgAgentTheme: any) => {
@@ -1324,7 +1380,11 @@ export default function ChatInterface({ agent }: ChatInterfaceProps) {
               style={{ background: meta.glowColor }}
             />
             
-            <div className="flex flex-col bg-[#12131c]/90 backdrop-blur-2xl rounded-xl w-full shadow-[0_20px_50px_rgba(0,0,0,0.6),inset_0_1px_1px_rgba(255,255,255,0.1)] border border-white/[0.12] focus-within:border-brand-500/60 focus-within:ring-2 focus-within:ring-brand-500/20 transition-all duration-300 overflow-hidden group p-1.5">
+            <div className={`flex flex-col bg-[#11121d]/90 backdrop-blur-2xl rounded-2xl w-full shadow-[0_20px_50px_rgba(0,0,0,0.6),inset_0_1px_1px_rgba(255,255,255,0.1)] border transition-all duration-300 overflow-hidden group p-2 ${
+              agent === 'Orqion' 
+                ? 'border-violet-500/25 focus-within:border-violet-500/70 focus-within:ring-2 focus-within:ring-violet-500/20' 
+                : 'border-white/[0.12] focus-within:border-brand-500/60 focus-within:ring-2 focus-within:ring-brand-500/20'
+            }`}>
               <textarea
                 value={localQuery}
                 onChange={(e) => setLocalQuery(e.target.value)}
@@ -1334,51 +1394,57 @@ export default function ChatInterface({ agent }: ChatInterfaceProps) {
                     if (localQuery.trim()) handleRunAgent(e as any);
                   }
                 }}
-                placeholder={isRunning ? "Agent is reasoning & generating response..." : `Ask ${agent}... (e.g. Plan project, analyze dependencies)`}
+                placeholder={
+                  isRunning 
+                    ? "Orqion is reasoning & executing task..." 
+                    : agent === 'Orqion' 
+                      ? "Message Orqion..." 
+                      : `Message ${agent}...`
+                }
                 disabled={isRunning}
                 rows={1}
-                className="w-full bg-transparent text-[13px] text-gray-100 outline-none placeholder-gray-500 disabled:opacity-50 px-2.5 py-1.5 resize-none max-h-28 min-h-[40px] custom-scrollbar"
+                className="w-full bg-transparent text-[13px] text-gray-100 outline-none placeholder-gray-500/80 disabled:opacity-50 px-2.5 py-1.5 resize-none max-h-32 min-h-[38px] custom-scrollbar"
                 autoFocus
                 style={{ height: 'auto' }}
                 onInput={(e) => {
                   const target = e.target as HTMLTextAreaElement;
                   target.style.height = 'auto';
-                  target.style.height = `${Math.min(target.scrollHeight, 112)}px`;
+                  target.style.height = `${Math.min(target.scrollHeight, 128)}px`;
                 }}
               />
 
-              <div className="flex items-center justify-between pt-1 px-1.5 border-t border-white/[0.04]">
-                <div className="flex items-center gap-2 text-[11px] text-gray-500">
-                  <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-white/[0.03] border border-white/[0.06] text-gray-400 font-mono text-[9.5px]">
-                    <Sparkles size={10} className={meta.textColor} />
-                    <span>Autonomous Mode</span>
+              <div className="flex items-center justify-between pt-1.5 px-1 border-t border-white/[0.04]">
+                <div className="flex items-center gap-1.5 select-none">
+                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full font-mono text-[10px] whitespace-nowrap ${
+                    agent === 'Orqion'
+                      ? 'bg-violet-500/15 border border-violet-500/30 text-violet-300'
+                      : 'bg-white/[0.03] border border-white/[0.06] text-gray-400'
+                  }`}>
+                    <Sparkles size={10} className={agent === 'Orqion' ? 'text-violet-400 animate-pulse' : meta.textColor} />
+                    <span>Autonomous</span>
                   </span>
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <span className="hidden sm:inline-block text-[9.5px] text-gray-500 font-mono">
-                    <kbd className="px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-gray-400">↵ Enter</kbd> to send
-                  </span>
                   <button
                     onClick={handleRunAgent}
                     disabled={isRunning || !localQuery.trim()}
-                    className={`px-3 py-1 rounded-lg flex items-center gap-1.5 transition-all duration-300 flex-shrink-0 cursor-pointer font-medium text-xs ${
-                      isRunning ? 'bg-brand-500/20 text-brand-400' : 
-                      !localQuery.trim() ? 'bg-white/5 text-gray-500 cursor-not-allowed' :
-                      'bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white shadow-[0_0_15px_rgba(124,58,237,0.4)] hover:shadow-[0_0_25px_rgba(124,58,237,0.6)] hover:scale-105 active:scale-95'
+                    className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 shrink-0 cursor-pointer ${
+                      isRunning
+                        ? 'bg-violet-500/20 text-violet-300 cursor-wait'
+                        : !localQuery.trim()
+                          ? 'bg-white/5 text-gray-600 cursor-not-allowed border border-white/5'
+                          : agent === 'Orqion'
+                            ? 'bg-gradient-to-tr from-violet-600 to-indigo-500 hover:from-violet-500 hover:to-indigo-400 text-white shadow-[0_0_15px_rgba(139,92,246,0.5)] active:scale-95'
+                            : 'bg-gradient-to-tr from-brand-600 to-indigo-500 hover:from-brand-500 hover:to-indigo-400 text-white shadow-[0_0_15px_rgba(124,58,237,0.4)] active:scale-95'
                     }`}
-                    title="Send message"
+                    title="Send message (Enter)"
+                    aria-label="Send message"
                   >
                     {isRunning ? (
-                      <>
-                        <Loader2 size={13} className="animate-spin" />
-                        <span>Thinking...</span>
-                      </>
+                      <Loader2 size={13} className="animate-spin text-violet-300" />
                     ) : (
-                      <>
-                        <span>Send</span>
-                        <Send size={12} />
-                      </>
+                      <ArrowUp size={14} strokeWidth={2.5} />
                     )}
                   </button>
                 </div>
