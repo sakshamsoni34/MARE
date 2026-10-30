@@ -1,4 +1,5 @@
 import { useStore, FileSystemNode } from '@/store/useStore';
+import { sendEventApi } from '@/lib/api';
 
 export const readDirectoryRecursive = async (dirHandle: any, parentId: string = ''): Promise<FileSystemNode[]> => {
   const nodes: FileSystemNode[] = [];
@@ -70,11 +71,7 @@ export const openWorkspaceFolder = async ({
       useStore.getState().addTerminalLog(`> <span class="text-green-400">Success:</span> Loaded workspace [${folderName}]`);
 
       // Notify backend of folder selection
-      fetch('http://localhost:8555/api/event', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'Open Folder', folderName })
-      }).catch(() => {});
+      sendEventApi('Open Folder', folderName).catch(() => {});
 
       if (onSuccess) {
         onSuccess(folderName);
@@ -126,11 +123,7 @@ export const openWorkspaceFolder = async ({
         useStore.getState().setActiveProject(folderName);
         useStore.getState().addTerminalLog(`> <span class="text-green-400">Success:</span> Loaded workspace [${folderName}]`);
 
-        fetch('http://localhost:8555/api/event', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'Open Folder', folderName })
-        }).catch(() => {});
+        sendEventApi('Open Folder', folderName).catch(() => {});
 
         if (onSuccess) {
           onSuccess(folderName);

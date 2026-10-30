@@ -17,6 +17,7 @@ import Sidebar from '@/components/Sidebar';
 import MenuBar from '@/components/MenuBar';
 
 import { useStore } from '@/store/useStore';
+import { fetchState, API_BASE_URL, getAuthHeaders } from '@/lib/api';
 
 export default function Dashboard() {
   const router = useRouter();
@@ -52,17 +53,23 @@ export default function Dashboard() {
   const areOpenAgentsRunning = openAgents.some(agent => runningAgents[agent]);
   const isAnyAgentRunning = Object.values(runningAgents).some(Boolean);
 
-  const [mounted, setMounted] = useState(false);
+  const [isHydrated, setIsHydrated] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
-    if (mounted && !activeProject) {
-      router.replace('/');
+    let isMounted = true;
+    async function initWorkspace() {
+      const persistedState = await fetchState();
+      if (!isMounted) return;
+      if (persistedState && persistedState.projects && persistedState.projects.length > 0) {
+        useStore.getState().hydrateState(persistedState);
+      } else if (!useStore.getState().activeProject) {
+        router.replace('/');
+      }
+      setIsHydrated(true);
     }
-  }, [activeProject, router, mounted]);
+    initWorkspace();
+    return () => { isMounted = false; };
+  }, [router]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -86,11 +93,9 @@ export default function Dashboard() {
       addTerminalLog(`> Status: <span class="text-accent-yellow">INITIALIZING ${agentToRun.toUpperCase()}...</span>`);
 
       try {
-        const response = await fetch('http://localhost:8555/api/agent', {
+        const response = await fetch(`${API_BASE_URL}/api/agent`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers: getAuthHeaders(),
           body: JSON.stringify({
             agentName: agentToRun,
             systemPrompt: useStore.getState().agentScripts[agentToRun] || 'You are a helpful AI assistant.',
@@ -175,7 +180,7 @@ export default function Dashboard() {
     await Promise.all(runPromises);
   };
 
-  if (!mounted || !activeProject) {
+  if (!isHydrated || !activeProject) {
     return null;
   }
 

@@ -40,6 +40,7 @@ import {
 } from 'lucide-react';
 import { useStore, Agent, FileSystemNode } from '@/store/useStore';
 import { useSession } from 'next-auth/react';
+import { API_BASE_URL, getAuthHeaders, syncConversationApi, syncFileApi } from '@/lib/api';
 
 interface ChatInterfaceProps {
   agent: Agent;
@@ -646,9 +647,9 @@ export default function ChatInterface({ agent }: ChatInterfaceProps) {
 
             const hubSystemPrompt = (AGENT_CONFIGS[subAgent]?.description || 'You are a helpful AI.') + autoWorkflowPrompt + `\n\n[CONTEXT FROM PREVIOUS AGENTS]\n${accumulatedContext}\nPlease build upon the previous responses to accomplish the user's request.`;
             
-            const response = await fetch('http://localhost:8555/api/agent', {
+            const response = await fetch(`${API_BASE_URL}/api/agent`, {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: getAuthHeaders(),
               body: JSON.stringify({
                 agentName: subAgent,
                 systemPrompt: hubSystemPrompt,
@@ -699,9 +700,9 @@ export default function ChatInterface({ agent }: ChatInterfaceProps) {
          }
       } else {
 
-      const response = await fetch('http://localhost:8555/api/agent', {
+      const response = await fetch(`${API_BASE_URL}/api/agent`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           agentName: agent,
           systemPrompt: systemPromptToUse,
@@ -839,16 +840,13 @@ export default function ChatInterface({ agent }: ChatInterfaceProps) {
 
       try {
         const fullAgentResponse = currentScriptCode.split(`**${agent}:**\n\n`)[1] || '';
-        await fetch('http://localhost:8555/api/sync/conversation', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            convo_id: Date.now().toString(),
-            agent: agent,
-            title: queryToUse.substring(0, 50),
-            content: fullAgentResponse.trim(),
-            timestamp: new Date().toISOString()
-          })
+        await syncConversationApi({
+          convo_id: Date.now().toString(),
+          project_name: useStore.getState().activeProject || undefined,
+          agent: agent,
+          title: queryToUse.substring(0, 50),
+          content: fullAgentResponse.trim(),
+          timestamp: new Date().toISOString()
         });
       } catch (logErr) {
         console.error("Failed to log chat:", logErr);
@@ -877,18 +875,15 @@ export default function ChatInterface({ agent }: ChatInterfaceProps) {
         setTimeout(() => setShowSavePopup(null), 3000);
 
         try {
-          await fetch('http://localhost:8555/api/sync/file', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              node_id: selectedNode.id,
-              parent_id: findParentFolder(fileSystem, selectedFolderId),
-              name: selectedNode.name,
-              type: 'file',
-              content: code,
-              agent_name: agent,
-              agent_contents: { [agent]: code }
-            })
+          await syncFileApi({
+            node_id: selectedNode.id,
+            project_name: useStore.getState().activeProject || undefined,
+            parent_id: findParentFolder(fileSystem, selectedFolderId),
+            name: selectedNode.name,
+            type: 'file',
+            content: code,
+            agent_name: agent,
+            agent_contents: { [agent]: code }
           });
         } catch (apiErr) {
           console.error("Failed to call save API:", apiErr);
@@ -918,18 +913,15 @@ export default function ChatInterface({ agent }: ChatInterfaceProps) {
       setTimeout(() => setShowSavePopup(null), 3000);
 
       try {
-        await fetch('http://localhost:8555/api/sync/file', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-              node_id: Date.now().toString(),
-              parent_id: selectedFolderId,
-              name: handle.name,
-              type: 'file',
-              content: code,
-              agent_name: agent,
-              agent_contents: { [agent]: code }
-          })
+        await syncFileApi({
+          node_id: Date.now().toString(),
+          project_name: useStore.getState().activeProject || undefined,
+          parent_id: selectedFolderId,
+          name: handle.name,
+          type: 'file',
+          content: code,
+          agent_name: agent,
+          agent_contents: { [agent]: code }
         });
       } catch (apiErr) {
         console.error("Failed to call save API:", apiErr);

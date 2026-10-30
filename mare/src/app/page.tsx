@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Activity, Cpu } from 'lucide-react';
 import { motion } from 'framer-motion';
 import MenuBar from '@/components/MenuBar';
@@ -8,6 +8,7 @@ import Sidebar from '@/components/Sidebar';
 import dynamic from 'next/dynamic';
 import SignInModal from '@/components/SignInModal';
 import { useStore } from '@/store/useStore';
+import { fetchState } from '@/lib/api';
 
 const ParticleSphere = dynamic(() => import('@/components/ParticleSphere'), {
   ssr: false,
@@ -16,6 +17,16 @@ const ParticleSphere = dynamic(() => import('@/components/ParticleSphere'), {
 
 export default function RootPage() {
   const { runningAgents } = useStore();
+
+  useEffect(() => {
+    async function loadState() {
+      const persistedState = await fetchState();
+      if (persistedState && persistedState.projects && persistedState.projects.length > 0) {
+        useStore.getState().hydrateState(persistedState);
+      }
+    }
+    loadState();
+  }, []);
 
   const isAnyAgentRunning = Object.values(runningAgents || {}).some(Boolean);
 

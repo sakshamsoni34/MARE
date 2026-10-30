@@ -33,6 +33,8 @@
 }
 
 :root {
+  --font-geist-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-geist-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   background: #000000;
   color: var(--color-text-primary);
 }
@@ -42,8 +44,8 @@ body {
   padding: 0;
   height: 100vh;
   overflow: hidden;
-  /* App should act like a desktop app */
   background: #000000;
+  font-family: var(--font-geist-sans);
 }
 
 /* Custom Scrollbar for a premium feel */

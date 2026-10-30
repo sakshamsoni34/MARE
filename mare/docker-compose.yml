@@ -1,0 +1,45 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: mare-backend
+    restart: unless-stopped
+    ports:
+      - "8555:8555"
+    environment:
+      - MISTRAL_API_KEY=${MISTRAL_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-44ef91b9231f4e72ad79f4c40b8a1c8f9000a6a3e5c9424bb9b30b42d6bd4db6}
+      - FRONTEND_URL=http://localhost:3000
+    volumes:
+      - mare_data:/app
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8555/healthz')"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mare-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXTAUTH_URL=http://localhost:3000
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-44ef91b9231f4e72ad79f4c40b8a1c8f9000a6a3e5c9424bb9b30b42d6bd4db6}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+      - NEXT_PUBLIC_API_URL=http://localhost:8555
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  mare_data:
+    driver: local
+

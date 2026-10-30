@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import dynamic from 'next/dynamic';
-import { Code, Play, Save, X } from 'lucide-react';
+import { Code, Play, Save, X, Terminal as TerminalIcon } from 'lucide-react';
 import { useStore, Agent, FileSystemNode } from '@/store/useStore';
+import { executeCodeApi } from '@/lib/api';
 
 // Dynamically import Monaco Editor to reduce initial bundle size
 const Editor = dynamic(() => import('@monaco-editor/react'), { 
@@ -32,6 +33,8 @@ export default function CodeEditor({ agent }: CodeEditorProps) {
   
   const code = agentScripts[agent] || '';
   const isRunning = runningAgents[agent];
+  const [showSavePopup, setShowSavePopup] = useState<string | null>(null);
+  const [isExecutingCode, setIsExecutingCode] = useState(false);
 
   const findNode = (nodes: FileSystemNode[], id: string): FileSystemNode | undefined => {
     for (const node of nodes) {
@@ -50,6 +53,43 @@ export default function CodeEditor({ agent }: CodeEditorProps) {
     }
   };
 
+  const handleExecuteCode = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isExecutingCode) return;
+    setIsExecutingCode(true);
+
+    if (!useStore.getState().isTerminalOpen) {
+      useStore.getState().toggleTerminal();
+    }
+
+    addTerminalLog(`> <span class="text-accent-yellow">Executing ${agent} script in Sandboxed AST Runtime...</span>`);
+
+    try {
+      const res = await executeCodeApi(code, 'python', 10);
+      if (res.status === 'success') {
+        addTerminalLog(`> <span class="text-accent-green">✓ Execution Finished</span> in ${res.duration_ms}ms (exit code: ${res.returncode})`);
+        if (res.stdout) {
+          const formatted = res.stdout.replace(/\n/g, '<br/>').replace(/ /g, '&nbsp;');
+          addTerminalLog(`<div class="text-emerald-300 font-mono text-xs pl-2 border-l-2 border-emerald-500/50 my-1">${formatted}</div>`);
+        }
+        if (res.stderr) {
+          const formattedErr = res.stderr.replace(/\n/g, '<br/>').replace(/ /g, '&nbsp;');
+          addTerminalLog(`<div class="text-amber-400 font-mono text-xs pl-2 border-l-2 border-amber-500/50 my-1">${formattedErr}</div>`);
+        }
+        if (!res.stdout && !res.stderr) {
+          addTerminalLog(`<span class="text-gray-400 font-mono text-xs">[Process finished with no output]</span>`);
+        }
+      } else {
+        const errorText = (res.stderr || 'Execution failed').replace(/\n/g, '<br/>');
+        addTerminalLog(`> <span class="text-accent-red">Security / Execution Failure:</span><br/><div class="text-red-400 font-mono text-xs pl-2 border-l-2 border-red-500/50 my-1">${errorText}</div>`);
+      }
+    } catch (err: any) {
+      addTerminalLog(`> <span class="text-accent-red">System Error:</span> ${err.message}`);
+    } finally {
+      setIsExecutingCode(false);
+    }
+  };
+
   const handleRunAgent = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (isRunning) return;
@@ -57,8 +97,10 @@ export default function CodeEditor({ agent }: CodeEditorProps) {
     setAgentRunning(agent, true);
     addTerminalLog(`> Status: <span class="text-accent-yellow">INITIALIZING ${agent.toUpperCase()}...</span>`);
 
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8555';
+
     try {
-      const response = await fetch('http://localhost:8555/api/agent', {
+      const response = await fetch(`${apiUrl}/api/agent`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -109,8 +151,8 @@ export default function CodeEditor({ agent }: CodeEditorProps) {
                     lastUpdate = now;
                   }
                 }
-              } catch (e) {
-                // ignore
+              } catch (_) {
+                // ignore streaming parse errors
               }
             }
           }
@@ -127,106 +169,51 @@ export default function CodeEditor({ agent }: CodeEditorProps) {
             useStore.getState().setWorkflowEdges(parsed.workflow.edges);
             useStore.getState().setWorkflowOpen(true);
             addTerminalLog(`> Status: <span class="text-accent-blue">Generated workflow from response.</span>`);
-
-            currentScriptCode = currentScriptCode.replace(match[0], '\n> *[Workflow configuration extracted and rendered in the Multi-Agent Workflow panel]*\n');
-            updateAgentScript(agent, currentScriptCode);
-            break;
           }
-        } catch (e) { }
+        } catch (_) {
+          // ignore json parsing
+        }
       }
 
-      addTerminalLog(`> Status: <span class="text-accent-green">${agent.toUpperCase()} TASK COMPLETED & GROUNDED</span>`);
-    } catch (error: any) {
-      addTerminalLog(`> <span class="text-accent-red">Error (${agent}):</span> ${error.message}`);
+      addTerminalLog(`> <span class="text-accent-green">${agent} execution completed.</span>`);
+    } catch (err: any) {
+      addTerminalLog(`> <span class="text-accent-red">Execution Error:</span> ${err.message}`);
     } finally {
       setAgentRunning(agent, false);
     }
   };
 
-  const [showSavePopup, setShowSavePopup] = useState<string | null>(null);
-
   const handleSave = async (e: React.MouseEvent) => {
     e.stopPropagation();
+    const currentScript = agentScripts[agent] || '';
+    const extension = agent.toLowerCase().includes('python') ? 'py' : 'ts';
+    const defaultFileName = `${agent.toLowerCase().replace(/\s+/g, '_')}.${extension}`;
 
-    // Save to virtual file system if a file is selected
     if (selectedFolderId) {
-      const selectedNode = findNode(fileSystem, selectedFolderId);
-      if (selectedNode && selectedNode.type === 'file') {
-        updateNodeContent(selectedFolderId, code, agent);
-        addTerminalLog(`> <span class="text-accent-green">Success:</span> Saved script to file "${selectedNode.name}".`);
-
-        // Show popup
-        setShowSavePopup(`Saved in file "${selectedNode.name}"`);
-        setTimeout(() => setShowSavePopup(null), 3000);
-
-        try {
-          await fetch('http://localhost:8555/api/sync/file', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              node_id: selectedNode.id,
-              name: selectedNode.name,
-              type: 'file',
-              content: code,
-              agent_name: agent,
-              agent_contents: { [agent]: code }
-            })
-          });
-        } catch (err) { }
-
-        return;
+      const targetNode = findNode(fileSystem, selectedFolderId);
+      if (targetNode) {
+        if (targetNode.type === 'file') {
+          updateNodeContent(targetNode.id, currentScript, agent);
+          setShowSavePopup(`Updated file: ${targetNode.name}`);
+          setTimeout(() => setShowSavePopup(null), 3000);
+          return;
+        } else if (targetNode.type === 'folder') {
+          createFile(selectedFolderId, defaultFileName, currentScript, agent);
+          setShowSavePopup(`Saved to ${targetNode.name}/${defaultFileName}`);
+          setTimeout(() => setShowSavePopup(null), 3000);
+          return;
+        }
       }
     }
 
-    try {
-      const handle = await (window as any).showSaveFilePicker({
-        suggestedName: `${agent.replace(' ', '_').toLowerCase()}_output.py`,
-        types: [{
-          description: 'Python Files',
-          accept: { 'text/x-python': ['.py', '.md'] },
-        }],
-      });
-      const writable = await handle.createWritable();
-      await writable.write(code);
-      await writable.close();
-      
-      createFile(selectedFolderId || null, handle.name, code, agent);
-      
-      addTerminalLog(`> <span class="text-accent-green">Success:</span> Saved ${agent} response to local file system.`);
-
-      setShowSavePopup(`Saved to local file system`);
-      setTimeout(() => setShowSavePopup(null), 3000);
-
-      try {
-        await fetch('http://localhost:8555/api/sync/file', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-              node_id: Date.now().toString(),
-              name: handle.name,
-              type: 'file',
-              content: code,
-              agent_name: agent,
-              agent_contents: { [agent]: code }
-          })
-        });
-      } catch (err) { }
-    } catch (err: any) {
-      if (err.name !== 'AbortError') {
-        addTerminalLog(`> <span class="text-accent-red">Error:</span> Failed to save file: ${err.message}`);
-      }
-    }
+    createFile(null, defaultFileName, currentScript, agent);
+    setShowSavePopup(`Saved ${defaultFileName} to root workspace`);
+    setTimeout(() => setShowSavePopup(null), 3000);
   };
 
-  const isActive = activeAgent === agent;
-
   return (
-    <div
-      className={`flex flex-1 flex-col rounded-2xl border bg-[#0a0a0f]/95 backdrop-blur-2xl overflow-hidden shadow-2xl mx-1 min-w-[300px] transition-all duration-300 ${
-        isActive 
-          ? 'border-brand-500/40 ring-1 ring-brand-500/20 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.8)]' 
-          : 'border-white/[0.07] opacity-95 hover:border-white/15'
-      }`}
+    <div 
+      className={`flex flex-1 flex-col rounded-xl border border-white/[0.08] bg-[#0c0d0e]/95 backdrop-blur-2xl overflow-hidden shadow-2xl transition-all duration-300 relative ${activeAgent === agent ? 'ring-1 ring-emerald-500/20' : 'opacity-90 hover:opacity-100'}`}
       onClick={() => setActiveAgent(agent)}
     >
       <div className="flex items-center justify-between border-b border-white/[0.07] bg-black/40 backdrop-blur-xl px-4 py-3 text-sm">
@@ -242,7 +229,35 @@ export default function CodeEditor({ agent }: CodeEditorProps) {
           </span>
         </div>
         
-        <div className="flex items-center gap-1.5 text-gray-400">
+        <div className="flex items-center gap-2 text-gray-400">
+          <button
+            onClick={handleExecuteCode}
+            disabled={isExecutingCode}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all border text-xs font-semibold cursor-pointer ${
+              isExecutingCode 
+                ? 'bg-amber-500/15 text-amber-300 border-amber-500/30 cursor-wait' 
+                : 'bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25 border-emerald-500/30 shadow-sm shadow-emerald-950/40'
+            }`}
+            title="Execute Python Code in Sandbox"
+          >
+            <TerminalIcon size={14} className={isExecutingCode ? 'animate-spin' : ''} />
+            <span>{isExecutingCode ? 'Running...' : 'Execute'}</span>
+          </button>
+
+          <button
+            onClick={handleRunAgent}
+            disabled={isRunning}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all border text-xs font-semibold cursor-pointer ${
+              isRunning 
+                ? 'bg-brand-500/15 text-brand-300 border-brand-500/30 opacity-60 cursor-not-allowed' 
+                : 'bg-white/5 hover:bg-white/10 text-gray-200 border-white/10 hover:text-white'
+            }`}
+            title="Prompt AI Agent for Code"
+          >
+            <Play size={13} fill={isRunning ? 'currentColor' : 'none'} />
+            <span>{isRunning ? 'Agent Active...' : 'AI Prompt'}</span>
+          </button>
+
           <button
             onClick={handleSave}
             className="p-2 rounded-lg hover:bg-white/[0.08] hover:text-white transition-all cursor-pointer border border-transparent hover:border-white/10"
@@ -251,16 +266,7 @@ export default function CodeEditor({ agent }: CodeEditorProps) {
             <Save size={15} />
           </button>
           
-          <button
-            onClick={handleRunAgent}
-            disabled={isRunning}
-            className={`p-2 rounded-lg transition-all border border-transparent ${isRunning ? 'text-brand-500 cursor-not-allowed opacity-50' : 'hover:bg-emerald-500/10 hover:text-emerald-400 hover:border-emerald-500/20 cursor-pointer'}`}
-            title="Run this agent"
-          >
-            <Play size={14} fill={isRunning ? "currentColor" : "none"} />
-          </button>
-          
-          <div className="w-px h-4 bg-white/10 mx-1" />
+          <div className="w-px h-4 bg-white/10 mx-0.5" />
 
           <button
             onClick={(e) => { e.stopPropagation(); removeOpenAgent(agent); }}

@@ -1,5 +1,15 @@
 import { create } from 'zustand';
 import { Node, Edge } from '@xyflow/react';
+import {
+  createProjectApi,
+  deleteProjectApi,
+  syncFileApi,
+  deleteFileApi,
+  syncConversationApi,
+  deleteConversationApi,
+  syncWorkflowApi,
+  syncAgentStateApi,
+} from '@/lib/api';
 
 export type Agent = 
   | 'Multi-Agent Hub' 
@@ -113,128 +123,148 @@ interface StoreState {
 }
 
 const initialCode = ``;
-
 const initialNodes: Node[] = [];
 const initialEdges: Edge[] = [];
 const initialFileSystem: FileSystemNode[] = [];
 
 export const useStore = create<StoreState>()(
-    (set) => ({
-      projects: [],
-      activeProject: '',
-      activeAgent: null,
-      openAgents: [],
-      terminalLogs: [
-        '> Status: IDLE...',
-        '> System ready. Create a new research project to deploy agents.'
-      ],
-      editorCode: initialCode,
-      agentScripts: { 'Researcher Agent': initialCode },
-      workflowNodes: initialNodes,
-      workflowEdges: initialEdges,
-      runningAgents: {},
-      isTerminalOpen: false,
-      isWorkflowOpen: false,
-      isSidebarOpen: true,
-      isRightSidebarOpen: false,
-      userQuery: '',
-      fileSystem: initialFileSystem,
-      selectedFolderId: null,
-      isSignInModalOpen: false,
-      pastConversations: [],
-      hubSelectedAgents: ['Planner Agent', 'Reviewer Agent'],
+  (set, get) => ({
+    projects: [],
+    activeProject: '',
+    activeAgent: null,
+    openAgents: [],
+    terminalLogs: [
+      '> Status: IDLE...',
+      '> System ready. Create a new research project to deploy agents.'
+    ],
+    editorCode: initialCode,
+    agentScripts: { 'Researcher Agent': initialCode },
+    workflowNodes: initialNodes,
+    workflowEdges: initialEdges,
+    runningAgents: {},
+    isTerminalOpen: false,
+    isWorkflowOpen: false,
+    isSidebarOpen: true,
+    isRightSidebarOpen: false,
+    userQuery: '',
+    fileSystem: initialFileSystem,
+    selectedFolderId: null,
+    isSignInModalOpen: false,
+    pastConversations: [],
+    hubSelectedAgents: ['Planner Agent', 'Reviewer Agent'],
 
-      setActiveProject: (project) => set({ activeProject: project }),
-      setSignInModalOpen: (isOpen) => set({ isSignInModalOpen: isOpen }),
-      setActiveAgent: (agent) => set((state) => {
-        if (state.activeAgent === agent) return state;
-        const currentAgent = state.activeAgent || 'Researcher Agent';
-        const newScripts = { ...state.agentScripts, [currentAgent]: state.editorCode };
-        const newCode = newScripts[agent] || '';
-        return { activeAgent: agent, agentScripts: newScripts, editorCode: newCode };
-      }),
-      addOpenAgent: (agent) => set((state) => {
-        if (state.openAgents.includes(agent)) {
-          if (state.activeAgent === agent) return state;
-          const currentAgent = state.activeAgent || 'Researcher Agent';
-          const newScripts = { ...state.agentScripts, [currentAgent]: state.editorCode };
-          return { activeAgent: agent, agentScripts: newScripts, editorCode: newScripts[agent] || '' };
-        }
-        
-        const currentAgent = state.activeAgent || 'Researcher Agent';
-        const newScripts = { ...state.agentScripts, [currentAgent]: state.editorCode };
-        if (newScripts[agent] === undefined) {
-          newScripts[agent] = '';
-        }
-        
+    setActiveProject: (project) => set({ activeProject: project }),
+    setSignInModalOpen: (isOpen) => set({ isSignInModalOpen: isOpen }),
+    setActiveAgent: (agent) => set((state) => {
+      if (state.activeAgent === agent) return state;
+      const newOpenAgents = state.openAgents.includes(agent) 
+        ? state.openAgents 
+        : [...state.openAgents, agent];
+      
+      const currentScript = state.agentScripts[agent] || '';
+      return {
+        activeAgent: agent,
+        openAgents: newOpenAgents,
+        editorCode: currentScript
+      };
+    }),
+    addOpenAgent: (agent) => set((state) => {
+      if (!state.openAgents.includes(agent)) {
         return {
           openAgents: [...state.openAgents, agent],
           activeAgent: agent,
-          agentScripts: newScripts,
-          editorCode: newScripts[agent] || ''
+          editorCode: state.agentScripts[agent] || ''
         };
-      }),
-      removeOpenAgent: (agent) => set((state) => {
-        const newOpenAgents = state.openAgents.filter(a => a !== agent);
-        if (state.activeAgent === agent) {
-          const currentAgent = state.activeAgent || 'Researcher Agent';
-          const newScripts = { ...state.agentScripts, [currentAgent]: state.editorCode };
-          const nextAgent = newOpenAgents.length > 0 ? newOpenAgents[newOpenAgents.length - 1] : null;
-          return {
-            openAgents: newOpenAgents,
-            activeAgent: nextAgent,
-            agentScripts: newScripts,
-            editorCode: nextAgent ? (newScripts[nextAgent] || '') : ''
-          };
-        }
-        return { openAgents: newOpenAgents };
-      }),
-      addTerminalLog: (log) => set((state) => ({ terminalLogs: [...state.terminalLogs, log] })),
-      updateLastTerminalLog: (log) => set((state) => {
-        if (state.terminalLogs.length === 0) return { terminalLogs: [log] };
-        const newLogs = [...state.terminalLogs];
+      }
+      return { activeAgent: agent, editorCode: state.agentScripts[agent] || '' };
+    }),
+    removeOpenAgent: (agent) => set((state) => {
+      const newOpen = state.openAgents.filter(a => a !== agent);
+      let newActive = state.activeAgent;
+      if (state.activeAgent === agent) {
+        newActive = newOpen.length > 0 ? newOpen[newOpen.length - 1] : null;
+      }
+      return {
+        openAgents: newOpen,
+        activeAgent: newActive,
+        editorCode: newActive ? (state.agentScripts[newActive] || '') : ''
+      };
+    }),
+    addTerminalLog: (log) => set((state) => ({
+      terminalLogs: [...state.terminalLogs, log]
+    })),
+    updateLastTerminalLog: (log) => set((state) => {
+      const newLogs = [...state.terminalLogs];
+      if (newLogs.length > 0) {
         newLogs[newLogs.length - 1] = log;
-        return { terminalLogs: newLogs };
-      }),
-      clearTerminalLogs: () => set({ terminalLogs: [] }),
-      setEditorCode: (code) => set((state) => ({
-        editorCode: code,
-        agentScripts: { ...state.agentScripts, [state.activeAgent || 'Researcher Agent']: code }
-      })),
-      updateAgentScript: (agent, code) => set((state) => {
-        const newScripts = { ...state.agentScripts, [agent]: code };
-        if (state.activeAgent === agent) {
-          return { agentScripts: newScripts, editorCode: code };
-        }
-        return { agentScripts: newScripts };
-      }),
-      setWorkflowNodes: (nodes) => set({ workflowNodes: nodes }),
-      setWorkflowEdges: (edges) => set({ workflowEdges: edges }),
-      setAgentRunning: (agent, isRunning) => set((state) => ({
-        runningAgents: { ...state.runningAgents, [agent]: isRunning }
-      })),
-      toggleTerminal: () => set((state) => ({ isTerminalOpen: !state.isTerminalOpen })),
-      toggleSidebar: () => set((state) => ({ isSidebarOpen: !state.isSidebarOpen })),
-      toggleRightSidebar: () => set((state) => ({ isRightSidebarOpen: !state.isRightSidebarOpen })),
-      toggleWorkflow: () => set((state) => ({ isWorkflowOpen: !state.isWorkflowOpen })),
-      setWorkflowOpen: (isOpen) => set({ isWorkflowOpen: isOpen }),
-      setUserQuery: (query) => set({ userQuery: query }),
-      createNewProject: (name, description, goal, source, priority) => set((state) => {
-        if (state.projects.includes(name)) return state;
-
-        let metaText = ``;
-        if (description) metaText += `\n# Details: ${description}`;
-        if (goal) metaText += `\n# Goal: ${goal}`;
-        if (source) metaText += `\n# Data Source: ${source}`;
-        if (priority) metaText += `\n# Priority: ${priority}`;
-
-        const newInitialCode = ``;
-
+      } else {
+        newLogs.push(log);
+      }
+      return { terminalLogs: newLogs };
+    }),
+    clearTerminalLogs: () => set({ terminalLogs: [] }),
+    setEditorCode: (code) => set((state) => {
+      if (state.activeAgent) {
         return {
-          projects: [...state.projects, name],
+          editorCode: code,
+          agentScripts: {
+            ...state.agentScripts,
+            [state.activeAgent]: code
+          }
+        };
+      }
+      return { editorCode: code };
+    }),
+    updateAgentScript: (agent, code) => {
+      set((state) => ({
+        agentScripts: {
+          ...state.agentScripts,
+          [agent]: code
+        },
+        editorCode: state.activeAgent === agent ? code : state.editorCode
+      }));
+      const activeProj = get().activeProject || 'default';
+      syncAgentStateApi({ agent_name: agent, project_name: activeProj, script_code: code }).catch(() => {});
+    },
+    setWorkflowNodes: (nodes) => {
+      set({ workflowNodes: nodes });
+      const state = get();
+      syncWorkflowApi({
+        project_name: state.activeProject || 'default',
+        nodes,
+        edges: state.workflowEdges,
+      }).catch(() => {});
+    },
+    setWorkflowEdges: (edges) => {
+      set({ workflowEdges: edges });
+      const state = get();
+      syncWorkflowApi({
+        project_name: state.activeProject || 'default',
+        nodes: state.workflowNodes,
+        edges,
+      }).catch(() => {});
+    },
+    setAgentRunning: (agent, isRunning) => set((state) => ({
+      runningAgents: {
+        ...state.runningAgents,
+        [agent]: isRunning
+      }
+    })),
+    toggleTerminal: () => set((state) => ({ isTerminalOpen: !state.isTerminalOpen })),
+    toggleSidebar: () => set((state) => ({ isSidebarOpen: !state.isSidebarOpen })),
+    toggleRightSidebar: () => set((state) => ({ isRightSidebarOpen: !state.isRightSidebarOpen })),
+    toggleWorkflow: () => set((state) => ({ isWorkflowOpen: !state.isWorkflowOpen })),
+    setWorkflowOpen: (isOpen) => set({ isWorkflowOpen: isOpen }),
+    setUserQuery: (query) => set({ userQuery: query }),
+    
+    createNewProject: (name, description, goal, source, priority) => {
+      set((state) => {
+        if (state.projects.includes(name)) return state;
+        return {
+          projects: [name, ...state.projects],
           activeProject: name,
-          editorCode: newInitialCode,
-          agentScripts: { 'Researcher Agent': newInitialCode },
+          editorCode: '',
+          agentScripts: { 'Researcher Agent': '' },
           terminalLogs: [
             '> Status: IDLE...',
             `> New research project "${name}" initialized.`,
@@ -245,8 +275,12 @@ export const useStore = create<StoreState>()(
           workflowNodes: [],
           workflowEdges: []
         };
-      }),
-      deleteProject: (name) => set((state) => {
+      });
+      createProjectApi({ name, description, goal, source, priority }).catch(console.error);
+    },
+    
+    deleteProject: (name) => {
+      set((state) => {
         const newProjects = state.projects.filter(p => p !== name);
         const newActiveProject = state.activeProject === name
           ? (newProjects.length > 0 ? newProjects[0] : '')
@@ -256,14 +290,23 @@ export const useStore = create<StoreState>()(
           activeProject: newActiveProject,
           terminalLogs: [...state.terminalLogs, `> Project "${name}" deleted.`]
         };
-      }),
-      createFile: (parentId, name, content, agentName) => set((state) => {
-        const newNode: FileSystemNode = { id: Date.now().toString() + Math.random().toString(36).substring(2, 9), name, type: 'file', content, agentName };
+      });
+      deleteProjectApi(name).catch(console.error);
+    },
+    
+    createFile: (parentId, name, content, agentName) => {
+      const newNode: FileSystemNode = {
+        id: Date.now().toString() + Math.random().toString(36).substring(2, 9),
+        name,
+        type: 'file',
+        content,
+        agentName
+      };
 
+      set((state) => {
         if (!parentId) {
           return { fileSystem: [...state.fileSystem, newNode] };
         }
-
         const addNodeToParent = (nodes: FileSystemNode[]): FileSystemNode[] => {
           return nodes.map(node => {
             if (node.id === parentId && node.type === 'folder') {
@@ -275,16 +318,34 @@ export const useStore = create<StoreState>()(
             return node;
           });
         };
-
         return { fileSystem: addNodeToParent(state.fileSystem) };
-      }),
-      createFolder: (parentId, name) => set((state) => {
-        const newNode: FileSystemNode = { id: Date.now().toString() + Math.random().toString(36).substring(2, 9), name, type: 'folder', isOpen: false, children: [] };
+      });
 
+      const activeProj = get().activeProject || 'default';
+      syncFileApi({
+        node_id: newNode.id,
+        parent_id: parentId,
+        project_name: activeProj,
+        name,
+        type: 'file',
+        content,
+        agent_name: agentName,
+      }).catch(console.error);
+    },
+    
+    createFolder: (parentId, name) => {
+      const newNode: FileSystemNode = {
+        id: Date.now().toString() + Math.random().toString(36).substring(2, 9),
+        name,
+        type: 'folder',
+        isOpen: false,
+        children: []
+      };
+
+      set((state) => {
         if (!parentId) {
           return { fileSystem: [...state.fileSystem, newNode] };
         }
-
         const addNodeToParent = (nodes: FileSystemNode[]): FileSystemNode[] => {
           return nodes.map(node => {
             if (node.id === parentId && node.type === 'folder') {
@@ -296,14 +357,27 @@ export const useStore = create<StoreState>()(
             return node;
           });
         };
-
         return { fileSystem: addNodeToParent(state.fileSystem) };
-      }),
-      renameNode: (id, newName) => set((state) => {
+      });
+
+      const activeProj = get().activeProject || 'default';
+      syncFileApi({
+        node_id: newNode.id,
+        parent_id: parentId,
+        project_name: activeProj,
+        name,
+        type: 'folder',
+      }).catch(console.error);
+    },
+
+    renameNode: (id, newName) => {
+      let targetNode: FileSystemNode | undefined;
+      set((state) => {
         const renameInNodes = (nodes: FileSystemNode[]): FileSystemNode[] => {
           return nodes.map(node => {
             if (node.id === id) {
-              return { ...node, name: newName };
+              targetNode = { ...node, name: newName };
+              return targetNode;
             }
             if (node.children) {
               return { ...node, children: renameInNodes(node.children) };
@@ -312,10 +386,23 @@ export const useStore = create<StoreState>()(
           });
         };
         return { fileSystem: renameInNodes(state.fileSystem) };
-      }),
-      deleteNode: (id) => set((state) => {
-        const deletedAgents = new Set<string>();
+      });
 
+      if (targetNode) {
+        const activeProj = get().activeProject || 'default';
+        syncFileApi({
+          node_id: targetNode.id,
+          name: targetNode.name,
+          type: targetNode.type,
+          project_name: activeProj,
+          content: targetNode.content,
+        }).catch(console.error);
+      }
+    },
+
+    deleteNode: (id) => {
+      set((state) => {
+        const deletedAgents = new Set<string>();
         const findAgentsInNode = (node: FileSystemNode) => {
           if (node.type === 'file') {
             if (node.agentName) deletedAgents.add(node.agentName);
@@ -344,7 +431,6 @@ export const useStore = create<StoreState>()(
         };
 
         const newFileSystem = deleteFromNodes(state.fileSystem);
-
         const newAgentScripts = { ...state.agentScripts };
         deletedAgents.forEach(agent => {
           newAgentScripts[agent] = '';
@@ -360,49 +446,58 @@ export const useStore = create<StoreState>()(
           agentScripts: newAgentScripts,
           editorCode: newEditorCode
         };
-      }),
-      toggleFolder: (id) => set((state) => {
-        const toggleNode = (nodes: FileSystemNode[]): FileSystemNode[] => {
-          return nodes.map(node => {
-            if (node.id === id) {
-              return { ...node, isOpen: !node.isOpen };
-            }
-            if (node.children) {
-              return { ...node, children: toggleNode(node.children) };
-            }
-            return node;
-          });
-        };
-        return { fileSystem: toggleNode(state.fileSystem) };
-      }),
-      expandFolder: (id) => set((state) => {
-        const expandNode = (nodes: FileSystemNode[]): FileSystemNode[] => {
-          return nodes.map(node => {
-            if (node.id === id && node.type === 'folder') {
-              return { ...node, isOpen: true };
-            }
-            if (node.children) {
-              return { ...node, children: expandNode(node.children) };
-            }
-            return node;
-          });
-        };
-        return { fileSystem: expandNode(state.fileSystem) };
-      }),
-      collapseAllFolders: () => set((state) => {
-        const collapseNodes = (nodes: FileSystemNode[]): FileSystemNode[] => {
-          return nodes.map(node => {
-            if (node.type === 'folder') {
-              return { ...node, isOpen: false, children: node.children ? collapseNodes(node.children) : [] };
-            }
-            return node;
-          });
-        };
-        return { fileSystem: collapseNodes(state.fileSystem) };
-      }),
-      setFileSystem: (nodes) => set({ fileSystem: nodes }),
-      setSelectedFolderId: (id) => set({ selectedFolderId: id }),
-      updateNodeContent: (id, content, agentName) => set((state) => {
+      });
+      deleteFileApi(id).catch(console.error);
+    },
+
+    toggleFolder: (id) => set((state) => {
+      const toggleNode = (nodes: FileSystemNode[]): FileSystemNode[] => {
+        return nodes.map(node => {
+          if (node.id === id) {
+            return { ...node, isOpen: !node.isOpen };
+          }
+          if (node.children) {
+            return { ...node, children: toggleNode(node.children) };
+          }
+          return node;
+        });
+      };
+      return { fileSystem: toggleNode(state.fileSystem) };
+    }),
+
+    expandFolder: (id) => set((state) => {
+      const expandNode = (nodes: FileSystemNode[]): FileSystemNode[] => {
+        return nodes.map(node => {
+          if (node.id === id && node.type === 'folder') {
+            return { ...node, isOpen: true };
+          }
+          if (node.children) {
+            return { ...node, children: expandNode(node.children) };
+          }
+          return node;
+        });
+      };
+      return { fileSystem: expandNode(state.fileSystem) };
+    }),
+
+    collapseAllFolders: () => set((state) => {
+      const collapseNodes = (nodes: FileSystemNode[]): FileSystemNode[] => {
+        return nodes.map(node => {
+          if (node.type === 'folder') {
+            return { ...node, isOpen: false, children: node.children ? collapseNodes(node.children) : [] };
+          }
+          return node;
+        });
+      };
+      return { fileSystem: collapseNodes(state.fileSystem) };
+    }),
+
+    setFileSystem: (nodes) => set({ fileSystem: nodes }),
+    setSelectedFolderId: (id) => set({ selectedFolderId: id }),
+
+    updateNodeContent: (id, content, agentName) => {
+      let targetNode: FileSystemNode | undefined;
+      set((state) => {
         const updateInNodes = (nodes: FileSystemNode[]): FileSystemNode[] => {
           return nodes.map(node => {
             if (node.id === id) {
@@ -411,8 +506,7 @@ export const useStore = create<StoreState>()(
                 currentAgentContents[node.agentName] = node.content;
               }
               const targetAgent = agentName || node.agentName || 'Researcher Agent';
-
-              return {
+              targetNode = {
                 ...node,
                 content,
                 agentName: targetAgent,
@@ -421,6 +515,7 @@ export const useStore = create<StoreState>()(
                   [targetAgent]: content
                 }
               };
+              return targetNode;
             }
             if (node.children) {
               return { ...node, children: updateInNodes(node.children) };
@@ -429,78 +524,111 @@ export const useStore = create<StoreState>()(
           });
         };
         return { fileSystem: updateInNodes(state.fileSystem) };
-      }),
-      savePastConversation: (agent, content) => set((state) => {
-        const initialText = `# ${agent} Script\n\n# Write your ${agent.toLowerCase()} prompt here...\n`;
-        let displayCode = content;
-        if (content.trim().startsWith('#') && !content.includes('**You:**') && !content.includes(`**${agent}:**`)) {
-          displayCode = '';
-        } else if (content.startsWith(initialText)) {
-          displayCode = content.substring(initialText.length).trimStart();
-        }
-        if (!displayCode.trim()) return state;
+      });
 
-        const titleMatch = content.match(/\*\*You:\*\*\s*([^\n]+)/);
+      if (targetNode) {
+        const activeProj = get().activeProject || 'default';
+        syncFileApi({
+          node_id: targetNode.id,
+          name: targetNode.name,
+          type: targetNode.type,
+          project_name: activeProj,
+          content: targetNode.content,
+          agent_name: targetNode.agentName,
+          agent_contents: targetNode.agentContents,
+        }).catch(console.error);
+      }
+    },
+
+    savePastConversation: (agent, content) => {
+      const initialText = `# ${agent} Script\n\n# Write your ${agent.toLowerCase()} prompt here...\n`;
+      let displayCode = content;
+      if (content.trim().startsWith('#') && !content.includes('**You:**') && !content.includes(`**${agent}:**`)) {
+        displayCode = '';
+      } else if (content.startsWith(initialText)) {
+        displayCode = content.substring(initialText.length).trimStart();
+      }
+      if (!displayCode.trim()) return;
+
+      const titleMatch = content.match(/\*\*You:\*\*\s*([^\n]+)/);
+      const title = titleMatch ? (titleMatch[1].length > 40 ? titleMatch[1].substring(0, 40) + '...' : titleMatch[1]) : `${agent} Chat`;
+      
+      const newConvo: PastConversation = {
+        id: Date.now().toString() + Math.random().toString(36).substring(2, 9),
+        agent,
+        title,
+        content,
+        timestamp: new Date().toISOString()
+      };
+
+      set((state) => ({ pastConversations: [...state.pastConversations, newConvo] }));
+
+      const activeProj = get().activeProject || 'default';
+      syncConversationApi({
+        convo_id: newConvo.id,
+        project_name: activeProj,
+        agent: newConvo.agent,
+        title: newConvo.title,
+        content: newConvo.content,
+        timestamp: newConvo.timestamp,
+      }).catch(console.error);
+    },
+
+    loadPastConversation: (agent, id) => set((state) => {
+      const convo = state.pastConversations.find(c => c.id === id);
+      if (!convo) return state;
+      
+      const currentCode = state.agentScripts[agent] || '';
+      const initialText = `# ${agent} Script\n\n# Write your ${agent.toLowerCase()} prompt here...\n`;
+      let displayCode = currentCode;
+      if (currentCode.trim().startsWith('#') && !currentCode.includes('**You:**') && !currentCode.includes(`**${agent}:**`)) {
+        displayCode = '';
+      } else if (currentCode.startsWith(initialText)) {
+        displayCode = currentCode.substring(initialText.length).trimStart();
+      }
+      
+      let newPastConvos = state.pastConversations.filter(c => c.id !== id);
+      
+      if (displayCode.trim()) {
+        const titleMatch = currentCode.match(/\*\*You:\*\*\s*([^\n]+)/);
         const title = titleMatch ? (titleMatch[1].length > 40 ? titleMatch[1].substring(0, 40) + '...' : titleMatch[1]) : `${agent} Chat`;
-        
-        const newConvo: PastConversation = {
+        const currentConvo: PastConversation = {
           id: Date.now().toString() + Math.random().toString(36).substring(2, 9),
           agent,
           title,
-          content,
+          content: currentCode,
           timestamp: new Date().toISOString()
         };
-        return { pastConversations: [...state.pastConversations, newConvo] };
-      }),
-      loadPastConversation: (agent, id) => set((state) => {
-        const convo = state.pastConversations.find(c => c.id === id);
-        if (!convo) return state;
-        
-        const currentCode = state.agentScripts[agent] || '';
-        const initialText = `# ${agent} Script\n\n# Write your ${agent.toLowerCase()} prompt here...\n`;
-        let displayCode = currentCode;
-        if (currentCode.trim().startsWith('#') && !currentCode.includes('**You:**') && !currentCode.includes(`**${agent}:**`)) {
-          displayCode = '';
-        } else if (currentCode.startsWith(initialText)) {
-          displayCode = currentCode.substring(initialText.length).trimStart();
-        }
-        
-        let newPastConvos = state.pastConversations.filter(c => c.id !== id);
-        
-        if (displayCode.trim()) {
-          const titleMatch = currentCode.match(/\*\*You:\*\*\s*([^\n]+)/);
-          const title = titleMatch ? (titleMatch[1].length > 40 ? titleMatch[1].substring(0, 40) + '...' : titleMatch[1]) : `${agent} Chat`;
-          const currentConvo: PastConversation = {
-            id: Date.now().toString() + Math.random().toString(36).substring(2, 9),
-            agent,
-            title,
-            content: currentCode,
-            timestamp: new Date().toISOString()
-          };
-          newPastConvos = [...newPastConvos, currentConvo];
-        }
+        newPastConvos = [...newPastConvos, currentConvo];
+      }
 
-        const newScripts = { ...state.agentScripts, [agent]: convo.content };
-        return {
-          pastConversations: newPastConvos,
-          agentScripts: newScripts,
-          editorCode: state.activeAgent === agent ? convo.content : state.editorCode
-        };
-      }),
-      deletePastConversation: (id) => set((state) => ({
+      const newScripts = { ...state.agentScripts, [agent]: convo.content };
+      return {
+        pastConversations: newPastConvos,
+        agentScripts: newScripts,
+        editorCode: state.activeAgent === agent ? convo.content : state.editorCode
+      };
+    }),
+
+    deletePastConversation: (id) => {
+      set((state) => ({
         pastConversations: state.pastConversations.filter(c => c.id !== id)
-      })),
-      toggleHubSelectedAgent: (agent) => set((state) => {
-        if (state.hubSelectedAgents.includes(agent)) {
-          return { hubSelectedAgents: state.hubSelectedAgents.filter(a => a !== agent) };
-        } else {
-          return { hubSelectedAgents: [...state.hubSelectedAgents, agent] };
-        }
-      }),
-      hydrateState: (payload) => set((state) => ({
-        ...state,
-        ...payload,
-        terminalLogs: [...state.terminalLogs, '> <span class="text-accent-green">System state hydrated from database successfully.</span>']
-      })),
-    })
+      }));
+      deleteConversationApi(id).catch(console.error);
+    },
+
+    toggleHubSelectedAgent: (agent) => set((state) => {
+      if (state.hubSelectedAgents.includes(agent)) {
+        return { hubSelectedAgents: state.hubSelectedAgents.filter(a => a !== agent) };
+      } else {
+        return { hubSelectedAgents: [...state.hubSelectedAgents, agent] };
+      }
+    }),
+
+    hydrateState: (payload) => set((state) => ({
+      ...state,
+      ...payload,
+      terminalLogs: [...state.terminalLogs, '> <span class="text-accent-green">Workspace hydrated from database successfully.</span>']
+    })),
+  })
 );

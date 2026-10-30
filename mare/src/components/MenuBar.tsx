@@ -5,6 +5,7 @@ import { PanelLeft, PanelBottom, PanelRight, Search, UserCircle, Bot } from 'luc
 import { useSession, signOut } from 'next-auth/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { openWorkspaceFolder } from '@/lib/workspace';
+import { sendEventApi, sendOquironApi } from '@/lib/api';
 
 type MenuState = 'File' | 'Edit' | 'View' | 'Terminal' | 'Help' | 'Settings' | 'Profile' | null;
 
@@ -58,15 +59,11 @@ export default function MenuBar({ onNewFile, onNewFolder, showProfile = false, s
   const handleAction = async (actionName: string, folderName?: string) => {
     addTerminalLog(`> <span class="text-brand-400">Action:</span> ${actionName}`);
     try {
-      const response = await fetch('http://localhost:8555/api/event', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: actionName, folderName: folderName }),
-      });
-      if (!response.ok) throw new Error(`API error: ${response.status}`);
-      const jsonResponse = await response.json();
-      const formattedJson = JSON.stringify(jsonResponse, null, 2).replace(/\n/g, '<br>').replace(/ /g, '&nbsp;');
-      addTerminalLog(`> <span class="text-blue-400">Response:</span> <br><pre class="text-xs text-white/60 mt-1">${formattedJson}</pre>`);
+      const jsonResponse = await sendEventApi(actionName, folderName);
+      if (jsonResponse) {
+        const formattedJson = JSON.stringify(jsonResponse, null, 2).replace(/\n/g, '<br>').replace(/ /g, '&nbsp;');
+        addTerminalLog(`> <span class="text-blue-400">Response:</span> <br><pre class="text-xs text-white/60 mt-1">${formattedJson}</pre>`);
+      }
     } catch (error) {
       addTerminalLog(`> <span class="text-red-400">Error:</span> ${error}`);
     }
@@ -272,11 +269,7 @@ export default function MenuBar({ onNewFile, onNewFolder, showProfile = false, s
               }
               toggleRightSidebar();
               try {
-                await fetch('http://localhost:8555/api/oquiron', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ agentName: 'Orqion', userQuery: 'Clicked Orqion', agentResponse: 'Opened' })
-                });
+                await sendOquironApi({ agentName: 'Orqion', userQuery: 'Clicked Orqion', agentResponse: 'Opened' });
               } catch (error) { console.error(error); }
             }}
             className={`flex items-center gap-2 px-3 py-1.5 ml-2 rounded-lg text-xs font-medium transition-all ${
