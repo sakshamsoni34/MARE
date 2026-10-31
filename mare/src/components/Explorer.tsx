@@ -39,26 +39,7 @@ export default function Explorer() {
   } = useStore();
   const [contextMenuInfo, setContextMenuInfo] = useState<{ x: number, y: number, nodeId: string } | null>(null);
   const [creatingItem, setCreatingItem] = useState<{ type: 'file' | 'folder', parentId: string | null } | null>(null);
-  const [isExplorerExpanded, setIsExplorerExpanded] = useState(true);
-  const [isEditingProjectName, setIsEditingProjectName] = useState(false);
-  const [projectNameInput, setProjectNameInput] = useState('');
 
-  const handleSaveProjectNameDirect = (newName: string) => {
-    const trimmed = newName.trim();
-    if (trimmed && trimmed !== activeProject) {
-      useStore.getState().setActiveProject(trimmed);
-      const currentFs = useStore.getState().fileSystem;
-      if (currentFs.length > 0 && currentFs[0].type === 'folder') {
-        const updatedFs = currentFs.map((item, idx) => idx === 0 ? { ...item, id: trimmed, name: trimmed } : item);
-        useStore.getState().setFileSystem(updatedFs);
-      }
-    }
-  };
-
-  const handleSaveProjectName = () => {
-    handleSaveProjectNameDirect(projectNameInput);
-    setIsEditingProjectName(false);
-  };
 
   React.useEffect(() => {
     const handleClick = () => setContextMenuInfo(null);
@@ -319,207 +300,178 @@ export default function Explorer() {
   return (
     <aside className="w-64 shrink-0 border-r border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] flex flex-col h-full select-none">
       <div
-        className="flex items-center justify-between p-2 hover:bg-[var(--color-bg-tertiary)] cursor-pointer transition-colors group relative"
-        onClick={() => {
-          if (!isEditingProjectName) {
-            setIsExplorerExpanded(!isExplorerExpanded);
+        className="flex-1 overflow-y-auto custom-scrollbar pb-6 pt-1"
+        onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            setSelectedFolderId(null);
           }
         }}
         onContextMenu={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          setContextMenuInfo({ x: e.pageX, y: e.pageY, nodeId: 'ROOT' });
+          if (e.target === e.currentTarget) {
+            e.preventDefault();
+            e.stopPropagation();
+            setContextMenuInfo({ x: e.pageX, y: e.pageY, nodeId: 'ROOT' });
+          }
         }}
       >
-        {isEditingProjectName ? (
-          <div onClick={(e) => e.stopPropagation()} className="flex items-center gap-1 flex-1">
-            <input
-              autoFocus
-              type="text"
-              value={projectNameInput}
-              onChange={(e) => setProjectNameInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleSaveProjectName();
-                if (e.key === 'Escape') setIsEditingProjectName(false);
-              }}
-              onBlur={handleSaveProjectName}
-              className="text-xs font-bold bg-[#1e1e1e] border border-brand-500 rounded px-1.5 py-0.5 text-white outline-none w-36 uppercase tracking-wider"
-            />
+        {activeProject ? (
+          <div className="flex flex-col min-h-full">
+            {/* Always render root-level input when creating item at root */}
+            {renderInput(null, 0)}
+
+            {fileSystem.length === 0 && !creatingItem ? (
+              <div className="flex flex-col items-center justify-center p-6 text-center text-text-tertiary gap-3 select-none">
+                <p className="text-xs">No files in "{activeProject}".</p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleNewItem('file');
+                    }}
+                    className="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-white/10 hover:bg-white/20 transition-all border border-white/10 shadow-sm"
+                  >
+                    + New File
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleNewItem('folder');
+                    }}
+                    className="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-white/10 hover:bg-white/20 transition-all border border-white/10 shadow-sm"
+                  >
+                    + New Folder
+                  </button>
+                </div>
+              </div>
+            ) : (
+              fileSystem.map(node => renderNode(node, 0))
+            )}
           </div>
         ) : (
-          <div 
-            className="flex items-center gap-1 overflow-hidden flex-1 cursor-pointer"
-            title="Click to toggle, or click edit to rename"
-          >
-            <span className="text-text-tertiary shrink-0">
-              {isExplorerExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-            </span>
-            <span className="text-xs font-bold text-text-tertiary uppercase tracking-wider truncate">
-              {activeProject ? activeProject : 'NO FOLDER OPEN'}
-            </span>
-          </div>
-        )}
-        {!activeProject && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              openWorkspaceFolder({
+          <div className="flex flex-col items-center justify-center p-6 text-center text-text-tertiary h-48 gap-3 select-none">
+            <FolderOpen size={30} className="text-brand-400/60" />
+            <p className="text-xs">No folder open in workspace.</p>
+            <button
+              onClick={() => openWorkspaceFolder({
                 status,
                 onRequireAuth: () => useStore.getState().setSignInModalOpen(true),
                 onSuccess: () => router.push('/dashboard')
-              });
-            }}
-            className="p-1 hover:bg-[#3c3c3c] rounded text-text-tertiary hover:text-brand-300 transition-colors"
-            title="Open Folder"
-          >
-            <FolderOpen size={14} />
-          </button>
-        )}
-        {activeProject && (
-          <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-            <button 
-              onClick={(e) => {
-                e.stopPropagation();
-                setProjectNameInput(activeProject);
-                setIsEditingProjectName(true);
-              }} 
-              className="p-1 hover:bg-[#3c3c3c] rounded text-text-tertiary hover:text-text-primary transition-colors" 
-              title="Rename Workspace Folder"
+              })}
+              className="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-brand-500 hover:bg-brand-600 transition-colors shadow-sm"
             >
-              <Edit2 size={13} />
-            </button>
-            <button onClick={handleNewFile} className="p-1 hover:bg-[#3c3c3c] rounded text-text-tertiary hover:text-text-primary transition-colors" title="New File">
-              <FilePlus size={15} />
-            </button>
-            <button onClick={handleNewFolder} className="p-1 hover:bg-[#3c3c3c] rounded text-text-tertiary hover:text-text-primary transition-colors" title="New Folder">
-              <FolderPlus size={15} />
-            </button>
-            <button onClick={handleRefresh} className="p-1 hover:bg-[#3c3c3c] rounded text-text-tertiary hover:text-text-primary transition-colors" title="Refresh">
-              <RefreshCw size={15} />
-            </button>
-            <button onClick={handleCollapseAll} className="p-1 hover:bg-[#3c3c3c] rounded text-text-tertiary hover:text-text-primary transition-colors" title="Collapse Folders">
-              <ListCollapse size={15} />
+              Open Folder
             </button>
           </div>
         )}
       </div>
-
-      {isExplorerExpanded && (
-        <div
-          className="flex-1 overflow-y-auto custom-scrollbar pb-6"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) {
-              setSelectedFolderId(null);
-            }
-          }}
-        >
-          {activeProject ? (
-            <div className="flex flex-col min-h-full">
-              {/* Always render root-level input when creating item at root */}
-              {renderInput(null, 0)}
-
-              {fileSystem.length === 0 && !creatingItem ? (
-                <div className="flex flex-col items-center justify-center p-6 text-center text-text-tertiary gap-3 select-none">
-                  <p className="text-xs">No files in "{activeProject}".</p>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleNewItem('file');
-                      }}
-                      className="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-white/10 hover:bg-white/20 transition-all border border-white/10 shadow-sm"
-                    >
-                      + New File
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleNewItem('folder');
-                      }}
-                      className="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-white/10 hover:bg-white/20 transition-all border border-white/10 shadow-sm"
-                    >
-                      + New Folder
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                fileSystem.map(node => renderNode(node, 0))
-              )}
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center p-6 text-center text-text-tertiary h-48 gap-3 select-none">
-              <FolderOpen size={30} className="text-brand-400/60" />
-              <p className="text-xs">No folder open in workspace.</p>
-              <button
-                onClick={() => openWorkspaceFolder({
-                  status,
-                  onRequireAuth: () => useStore.getState().setSignInModalOpen(true),
-                  onSuccess: () => router.push('/dashboard')
-                })}
-                className="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-brand-500 hover:bg-brand-600 transition-colors shadow-sm"
-              >
-                Open Folder
-              </button>
-            </div>
-          )}
-        </div>
-      )}
 
       {contextMenuInfo && (
         <div
           className="fixed z-[100] w-48 rounded-md border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] shadow-xl py-1 overflow-hidden"
           style={{ top: contextMenuInfo.y, left: contextMenuInfo.x }}
         >
-          {contextMenuInfo.nodeId === 'ROOT' && activeProject && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                const newName = window.prompt('Enter new workspace folder name:', activeProject);
-                if (newName && newName.trim()) {
-                  handleSaveProjectNameDirect(newName.trim());
-                }
-                setContextMenuInfo(null);
-              }}
-              className="flex w-full items-center gap-2 px-4 py-2 text-sm text-text-primary hover:bg-[var(--color-bg-tertiary)] transition-colors text-left"
-            >
-              <Edit2 size={14} /> Rename Workspace
-            </button>
+          {contextMenuInfo.nodeId === 'ROOT' && (
+            <>
+              {activeProject && (
+                <>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleNewItem('file');
+                      setContextMenuInfo(null);
+                    }}
+                    className="flex w-full items-center gap-2 px-4 py-2 text-sm text-text-primary hover:bg-[var(--color-bg-tertiary)] transition-colors text-left"
+                  >
+                    <FilePlus size={14} /> New File
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleNewItem('folder');
+                      setContextMenuInfo(null);
+                    }}
+                    className="flex w-full items-center gap-2 px-4 py-2 text-sm text-text-primary hover:bg-[var(--color-bg-tertiary)] transition-colors text-left"
+                  >
+                    <FolderPlus size={14} /> New Folder
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openWorkspaceFolder({
+                        status,
+                        onRequireAuth: () => useStore.getState().setSignInModalOpen(true),
+                        onSuccess: () => router.push('/dashboard')
+                      });
+                      setContextMenuInfo(null);
+                    }}
+                    className="flex w-full items-center gap-2 px-4 py-2 text-sm text-text-primary hover:bg-[var(--color-bg-tertiary)] transition-colors text-left"
+                  >
+                    <FolderOpen size={14} /> Open Other Folder...
+                  </button>
+                  <div className="h-px bg-white/10 my-1" />
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      useStore.getState().setActiveProject('');
+                      useStore.getState().setFileSystem([]);
+                      setContextMenuInfo(null);
+                    }}
+                    className="flex w-full items-center gap-2 px-4 py-2 text-sm text-accent-red hover:bg-[var(--color-bg-tertiary)] transition-colors text-left"
+                  >
+                    <Trash2 size={14} /> Close Workspace
+                  </button>
+                </>
+              )}
+              {!activeProject && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openWorkspaceFolder({
+                      status,
+                      onRequireAuth: () => useStore.getState().setSignInModalOpen(true),
+                      onSuccess: () => router.push('/dashboard')
+                    });
+                    setContextMenuInfo(null);
+                  }}
+                  className="flex w-full items-center gap-2 px-4 py-2 text-sm text-text-primary hover:bg-[var(--color-bg-tertiary)] transition-colors text-left"
+                >
+                  <FolderOpen size={14} /> Open Folder...
+                </button>
+              )}
+            </>
           )}
           {contextMenuInfo.nodeId !== 'ROOT' && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                const targetNode = findNode(fileSystem, contextMenuInfo.nodeId);
-                const currentName = targetNode?.name || '';
-                const newName = window.prompt('Enter new name:', currentName);
-                if (newName && newName.trim()) {
-                  renameNode(contextMenuInfo.nodeId, newName.trim());
-                }
-                setContextMenuInfo(null);
-              }}
-              className="flex w-full items-center gap-2 px-4 py-2 text-sm text-text-primary hover:bg-[var(--color-bg-tertiary)] transition-colors text-left"
-            >
-              <Edit2 size={14} /> Rename
-            </button>
+            <>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const targetNode = findNode(fileSystem, contextMenuInfo.nodeId);
+                  const currentName = targetNode?.name || '';
+                  const newName = window.prompt('Enter new name:', currentName);
+                  if (newName && newName.trim()) {
+                    renameNode(contextMenuInfo.nodeId, newName.trim());
+                  }
+                  setContextMenuInfo(null);
+                }}
+                className="flex w-full items-center gap-2 px-4 py-2 text-sm text-text-primary hover:bg-[var(--color-bg-tertiary)] transition-colors text-left"
+              >
+                <Edit2 size={14} /> Rename
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  deleteNode(contextMenuInfo.nodeId);
+                  if (selectedFolderId === contextMenuInfo.nodeId) {
+                    setSelectedFolderId(null);
+                  }
+                  setContextMenuInfo(null);
+                }}
+                className="flex w-full items-center gap-2 px-4 py-2 text-sm text-accent-red hover:bg-[var(--color-bg-tertiary)] transition-colors text-left"
+              >
+                <Trash2 size={14} /> Delete
+              </button>
+            </>
           )}
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              if (contextMenuInfo.nodeId === 'ROOT') {
-                useStore.getState().setActiveProject('');
-                useStore.getState().setFileSystem([]);
-              } else {
-                deleteNode(contextMenuInfo.nodeId);
-                if (selectedFolderId === contextMenuInfo.nodeId) {
-                  setSelectedFolderId(null);
-                }
-              }
-              setContextMenuInfo(null);
-            }}
-            className="flex w-full items-center gap-2 px-4 py-2 text-sm text-accent-red hover:bg-[var(--color-bg-tertiary)] transition-colors text-left"
-          >
-            <Trash2 size={14} /> Delete
-          </button>
         </div>
       )}
     </aside>
