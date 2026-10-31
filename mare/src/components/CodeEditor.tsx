@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import dynamic from 'next/dynamic';
-import { Code, Play, Save, X, Terminal as TerminalIcon } from 'lucide-react';
+import { Code, Play, Save, X, Terminal as TerminalIcon, Shield } from 'lucide-react';
 import { useStore, Agent, FileSystemNode } from '@/store/useStore';
 import { executeCodeApi } from '@/lib/api';
 
@@ -226,6 +226,14 @@ export default function CodeEditor({ agent }: CodeEditorProps) {
           <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9.5px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
             <span className="font-mono">MARE</span>
+          </span>
+
+          <span 
+            className="hidden sm:flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono text-cyan-400 bg-cyan-500/10 border border-cyan-500/20"
+            title="Code runs in an isolated ephemeral directory with AST static analysis and resource limits"
+          >
+            <Shield size={11} />
+            <span>Sandbox Guard</span>
           </span>
         </div>
         

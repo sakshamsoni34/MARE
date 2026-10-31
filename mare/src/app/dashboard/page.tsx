@@ -15,6 +15,7 @@ const WorkflowVisualizer = dynamic(() => import('@/components/WorkflowVisualizer
 });
 import Sidebar from '@/components/Sidebar';
 import MenuBar from '@/components/MenuBar';
+import ErrorBoundary from '@/components/ErrorBoundary';
 
 import { useStore } from '@/store/useStore';
 import { fetchState, API_BASE_URL, getAuthHeaders } from '@/lib/api';
@@ -58,9 +59,17 @@ export default function Dashboard() {
   useEffect(() => {
     let isMounted = true;
     async function initWorkspace() {
+      // If a folder has already been loaded into the active session, preserve it
+      const currentProject = useStore.getState().activeProject;
+      const currentFiles = useStore.getState().fileSystem;
+      if (currentProject && currentFiles.length > 0) {
+        setIsHydrated(true);
+        return;
+      }
+
       const persistedState = await fetchState();
       if (!isMounted) return;
-      if (persistedState && persistedState.projects && persistedState.projects.length > 0) {
+      if (persistedState && persistedState.activeProject && persistedState.projects && persistedState.projects.length > 0) {
         useStore.getState().hydrateState(persistedState);
       } else if (!useStore.getState().activeProject) {
         router.replace('/');
@@ -207,11 +216,13 @@ export default function Dashboard() {
                           style={agentWidths[agent] ? { width: agentWidths[agent], flex: 'none' } : { flex: 1, minWidth: 300 }}
                           className="flex flex-col"
                         >
-                          {agent.toLowerCase().includes('coder') || agent.toLowerCase().includes('python') || agent.toLowerCase().includes('automation') ? (
-                            <CodeEditor agent={agent} />
-                          ) : (
-                            <ChatInterface agent={agent} />
-                          )}
+                          <ErrorBoundary fallbackTitle={`${agent} Panel Error`}>
+                            {agent.toLowerCase().includes('coder') || agent.toLowerCase().includes('python') || agent.toLowerCase().includes('automation') ? (
+                              <CodeEditor agent={agent} />
+                            ) : (
+                              <ChatInterface agent={agent} />
+                            )}
+                          </ErrorBoundary>
                         </div>
                         {index < openAgents.length - 1 && (
                           <div
@@ -262,12 +273,18 @@ export default function Dashboard() {
                       }}
                     />
                     <div style={{ width: workflowWidth }} className="flex flex-shrink-0">
-                      <WorkflowVisualizer />
+                      <ErrorBoundary fallbackTitle="Workflow Visualizer Error">
+                        <WorkflowVisualizer />
+                      </ErrorBoundary>
                     </div>
                   </>
                 )}
               </div>
-              {isTerminalOpen && <TerminalOutput />}
+              {isTerminalOpen && (
+                <ErrorBoundary fallbackTitle="Terminal Console Error">
+                  <TerminalOutput />
+                </ErrorBoundary>
+              )}
             </main>
             {isRightSidebarOpen && (
               <>
@@ -293,7 +310,9 @@ export default function Dashboard() {
                   }}
                 />
                 <div style={{ width: rightSidebarWidth }} className="flex-shrink-0 flex flex-col border-l border-[var(--color-border-primary)] bg-[var(--color-bg-primary)] p-2">
-                  <ChatInterface agent="Orqion" />
+                  <ErrorBoundary fallbackTitle="Orqion Assistant Error">
+                    <ChatInterface agent="Orqion" />
+                  </ErrorBoundary>
                 </div>
               </>
             )}

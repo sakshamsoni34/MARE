@@ -7,11 +7,13 @@ import sqlite3
 from fastapi import FastAPI, Request, HTTPException, Depends, Query, status
 from fastapi.responses import StreamingResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.exceptions import RequestValidationError
 from dotenv import load_dotenv
 from contextlib import asynccontextmanager
 import sys
 import subprocess
 import time
+import uuid
 from typing import Optional, Dict, Any
 
 from models import (
@@ -37,7 +39,7 @@ from security_system import (
     auditor,
     rate_limiter
 )
-from database import get_db, init_db
+from database import get_db, init_db, DB_TYPE
 from auth import (
     get_current_user,
     require_role,
@@ -71,10 +73,52 @@ async def lifespan(app: FastAPI):
     yield
     await app.state.client.aclose()
 
+SERVER_START_TIME = datetime.now(timezone.utc)
+
 app = FastAPI(lifespan=lifespan, title="MARE Multi-Agent Advanced LLM Platform API")
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """
+    Standardized Server-Side Validation Exception Handler.
+    Intercepts schema validation failures and returns clean, uniform HTTP 400 responses
+    without exposing internal Pydantic traces or system architecture.
+    """
+    errors = exc.errors()
+    first_err = errors[0] if errors else {}
+    msg = first_err.get("msg", "Invalid input parameters.").replace("Value error, ", "").strip()
+    return JSONResponse(
+        status_code=400,
+        content={"status": "error", "message": msg}
+    )
 
 # Autonomous Backend Security Perimeter Middleware (OWASP headers, secret scrubbing, rate-limiting)
 app.add_middleware(SecurityPerimeterMiddleware)
+
+def get_client_ip(request: Request) -> str:
+    """Extract client IP respecting X-Forwarded-For headers when behind reverse proxies."""
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else "127.0.0.1"
+
+@app.middleware("http")
+async def structured_logging_middleware(request: Request, call_next):
+    request_id = str(uuid.uuid4())[:8]
+    start_time = time.time()
+    client_ip = get_client_ip(request)
+    
+    response = await call_next(request)
+    
+    duration_ms = round((time.time() - start_time) * 1000, 2)
+    response.headers["X-Request-ID"] = request_id
+    response.headers["X-Response-Time"] = f"{duration_ms}ms"
+    
+    if request.url.path not in ("/healthz", "/readyz") or response.status_code >= 400:
+        logger.info(
+            f"[{request_id}] {request.method} {request.url.path} -> {response.status_code} ({duration_ms}ms) | IP: {client_ip}"
+        )
+    return response
 
 app.add_middleware(
     CORSMiddleware,
@@ -97,18 +141,23 @@ def get_client(request: Request) -> httpx.AsyncClient:
 # ----------------- AUTHENTICATION & MULTI-TENANCY -----------------
 
 @app.post("/api/auth/register")
-async def register_user(body: UserRegisterRequest, conn: sqlite3.Connection = Depends(get_db)):
+async def register_user(request: Request, body: UserRegisterRequest, conn: sqlite3.Connection = Depends(get_db)):
+    client_ip = get_client_ip(request)
+    
+    # Registration anti-flooding rate limit
+    if not rate_limiter.is_registration_allowed(client_ip):
+        return JSONResponse(
+            status_code=429,
+            content={"status": "error", "message": "Too many registration attempts. Please try again later."}
+        )
+
     clean_email = body.email.strip().lower()
-    if not clean_email or "@" not in clean_email:
-        return JSONResponse(status_code=400, content={"status": "error", "message": "Invalid email address format."})
-    if len(body.password) < 6:
-        return JSONResponse(status_code=400, content={"status": "error", "message": "Password must be at least 6 characters long."})
 
     try:
         cursor = conn.cursor()
         cursor.execute("SELECT id FROM users WHERE email = ?", (clean_email,))
         if cursor.fetchone():
-            return JSONResponse(status_code=400, content={"status": "error", "message": "Account with this email already exists."})
+            return JSONResponse(status_code=400, content={"status": "error", "message": "An account with this email address already exists. Please sign in instead."})
 
         hashed_pw = hash_password(body.password)
         cursor.execute("""
@@ -137,22 +186,41 @@ async def register_user(body: UserRegisterRequest, conn: sqlite3.Connection = De
             }
         })
     except Exception as e:
-        logger.error(f"Error registering user: {e}")
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+        logger.error(f"Error registering user: {e}", exc_info=True)
+        return JSONResponse(status_code=500, content={"status": "error", "message": "An unexpected error occurred. Please try again later."})
 
 @app.post("/api/auth/login")
-async def login_user(body: UserLoginRequest, conn: sqlite3.Connection = Depends(get_db)):
+async def login_user(request: Request, body: UserLoginRequest, conn: sqlite3.Connection = Depends(get_db)):
+    client_ip = get_client_ip(request)
     clean_email = body.email.strip().lower()
+
+    # Rate limiting: Max 5 failed attempts within 300 seconds (per IP and per email)
+    is_allowed, retry_after = rate_limiter.check_login_rate_limit(client_ip, email=clean_email)
+    if not is_allowed:
+        return JSONResponse(
+            status_code=429,
+            headers={"Retry-After": str(retry_after)},
+            content={
+                "status": "error", 
+                "message": f"Too many failed login attempts. Please try again in {retry_after} seconds."
+            }
+        )
+
     try:
         cursor = conn.cursor()
         cursor.execute("SELECT id, email, password_hash, first_name, last_name, role FROM users WHERE email = ?", (clean_email,))
         user = cursor.fetchone()
 
         if not user or not user["password_hash"]:
+            rate_limiter.record_login_failure(client_ip, email=clean_email)
             return JSONResponse(status_code=401, content={"status": "error", "message": "Invalid email or password."})
 
         if not verify_password(body.password, user["password_hash"]):
+            rate_limiter.record_login_failure(client_ip, email=clean_email)
             return JSONResponse(status_code=401, content={"status": "error", "message": "Invalid email or password."})
+
+        # Successful authentication: clear failure count
+        rate_limiter.record_login_success(client_ip, email=clean_email)
 
         token = create_access_token({
             "sub": user["email"],
@@ -172,8 +240,8 @@ async def login_user(body: UserLoginRequest, conn: sqlite3.Connection = Depends(
             }
         })
     except Exception as e:
-        logger.error(f"Error logging in user: {e}")
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+        logger.error(f"Error logging in user: {e}", exc_info=True)
+        return JSONResponse(status_code=500, content={"status": "error", "message": "An unexpected error occurred. Please try again later."})
 
 @app.get("/api/auth/me")
 async def get_me(current_user: dict = Depends(get_current_user)):
@@ -188,7 +256,7 @@ async def handle_agent_request(
     client: httpx.AsyncClient = Depends(get_client),
     current_user: dict = Depends(get_current_user)
 ):
-    client_ip = request.client.host if request.client else "127.0.0.1"
+    client_ip = get_client_ip(request)
 
     # 1. Prompt Injection & Adversarial Attack Defense Layer
     clean_query, clean_system_prompt, was_adversarial = PromptSecurityGuard.inspect_and_sanitize(
@@ -249,8 +317,8 @@ async def get_state(
         projects_rows = cursor.fetchall()
         projects = [row["name"] for row in projects_rows]
 
-        # Determine active project
-        active_project = project if (project and project in projects) else (projects[0] if projects else "")
+        # Determine active project: only activate if explicitly requested
+        active_project = project if (project and project in projects) else ""
 
         # 2. Fetch File System for active project
         if active_project:
@@ -258,9 +326,9 @@ async def get_state(
                 "SELECT * FROM files WHERE project_name = ? ORDER BY created_at ASC", 
                 (active_project,)
             )
+            files_data = cursor.fetchall()
         else:
-            cursor.execute("SELECT * FROM files ORDER BY created_at ASC")
-        files_data = cursor.fetchall()
+            files_data = []
 
         file_system = []
         for f in files_data:
@@ -352,7 +420,7 @@ async def get_state(
         })
     except Exception as e:
         logger.error(f"Error hydrating state: {e}", exc_info=True)
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+        return JSONResponse(status_code=500, content={"status": "error", "message": "Failed to retrieve workspace state. Please try again later."})
 
 @app.post("/api/projects")
 async def create_project(
@@ -386,8 +454,8 @@ async def create_project(
             "name": clean_name
         })
     except Exception as e:
-        logger.error(f"Error creating project: {e}")
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+        logger.error(f"Error creating project: {e}", exc_info=True)
+        return JSONResponse(status_code=500, content={"status": "error", "message": "Failed to create project. Please try again later."})
 
 @app.delete("/api/projects/{name}")
 async def delete_project(
@@ -419,12 +487,12 @@ async def delete_project(
 
         return JSONResponse(content={"status": "success", "message": f"Project '{clean_name}' deleted."})
     except Exception as e:
-        logger.error(f"Error deleting project: {e}")
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+        logger.error(f"Error deleting project: {e}", exc_info=True)
+        return JSONResponse(status_code=500, content={"status": "error", "message": "Failed to delete project. Please try again later."})
 
 @app.post("/api/sync/file")
 async def sync_file(body: SyncFileRequest, request: Request, conn: sqlite3.Connection = Depends(get_db)):
-    client_ip = request.client.host if request.client else "127.0.0.1"
+    client_ip = get_client_ip(request)
 
     # Validate filename against directory traversal & dangerous executables
     is_valid, reason = PathSecurityGuard.validate_filename(body.name, client_ip)
@@ -468,8 +536,8 @@ async def sync_file(body: SyncFileRequest, request: Request, conn: sqlite3.Conne
             "timestamp": datetime.now(timezone.utc).isoformat()
         })
     except Exception as e:
-        logger.error(f"Error persisting file: {e}")
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+        logger.error(f"Error persisting file: {e}", exc_info=True)
+        return JSONResponse(status_code=500, content={"status": "error", "message": "Failed to persist file. Please try again later."})
 
 @app.delete("/api/sync/file/{node_id}")
 async def delete_file(node_id: str, conn: sqlite3.Connection = Depends(get_db)):
@@ -479,8 +547,8 @@ async def delete_file(node_id: str, conn: sqlite3.Connection = Depends(get_db)):
         conn.commit()
         return JSONResponse(content={"status": "success", "message": f"Node '{node_id}' removed."})
     except Exception as e:
-        logger.error(f"Error deleting file node: {e}")
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+        logger.error(f"Error deleting file node: {e}", exc_info=True)
+        return JSONResponse(status_code=500, content={"status": "error", "message": "Failed to delete file node. Please try again later."})
 
 @app.post("/api/sync/conversation")
 async def sync_conversation(body: SyncConversationRequest, conn: sqlite3.Connection = Depends(get_db)):
@@ -512,8 +580,8 @@ async def sync_conversation(body: SyncConversationRequest, conn: sqlite3.Connect
             "timestamp": datetime.now(timezone.utc).isoformat()
         })
     except Exception as e:
-        logger.error(f"Error persisting conversation: {e}")
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+        logger.error(f"Error persisting conversation: {e}", exc_info=True)
+        return JSONResponse(status_code=500, content={"status": "error", "message": "Failed to persist conversation. Please try again later."})
 
 @app.delete("/api/sync/conversation/{convo_id}")
 async def delete_conversation(convo_id: str, conn: sqlite3.Connection = Depends(get_db)):
@@ -523,8 +591,8 @@ async def delete_conversation(convo_id: str, conn: sqlite3.Connection = Depends(
         conn.commit()
         return JSONResponse(content={"status": "success", "message": f"Conversation '{convo_id}' deleted."})
     except Exception as e:
-        logger.error(f"Error deleting conversation: {e}")
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+        logger.error(f"Error deleting conversation: {e}", exc_info=True)
+        return JSONResponse(status_code=500, content={"status": "error", "message": "Failed to delete conversation. Please try again later."})
 
 @app.post("/api/sync/workflow")
 async def sync_workflow(body: SyncWorkflowRequest, conn: sqlite3.Connection = Depends(get_db)):
@@ -550,8 +618,8 @@ async def sync_workflow(body: SyncWorkflowRequest, conn: sqlite3.Connection = De
             "timestamp": datetime.now(timezone.utc).isoformat()
         })
     except Exception as e:
-        logger.error(f"Error persisting workflow: {e}")
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+        logger.error(f"Error persisting workflow: {e}", exc_info=True)
+        return JSONResponse(status_code=500, content={"status": "error", "message": "Failed to persist workflow. Please try again later."})
 
 @app.post("/api/sync/agent-state")
 async def sync_agent_state(body: SyncAgentStateRequest, conn: sqlite3.Connection = Depends(get_db)):
@@ -574,8 +642,8 @@ async def sync_agent_state(body: SyncAgentStateRequest, conn: sqlite3.Connection
             "timestamp": datetime.now(timezone.utc).isoformat()
         })
     except Exception as e:
-        logger.error(f"Error persisting agent state: {e}")
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+        logger.error(f"Error persisting agent state: {e}", exc_info=True)
+        return JSONResponse(status_code=500, content={"status": "error", "message": "Failed to persist agent state. Please try again later."})
 
 @app.get("/api/db-test")
 async def db_test(conn: sqlite3.Connection = Depends(get_db)):
@@ -591,13 +659,14 @@ async def db_test(conn: sqlite3.Connection = Depends(get_db)):
                 counts[t] = cursor.fetchone()["cnt"]
         return JSONResponse(content={
             "status": "success", 
-            "database": "sqlite", 
+            "database": DB_TYPE, 
             "tables": tables,
             "row_counts": counts,
             "timestamp": datetime.now(timezone.utc).isoformat()
         })
     except Exception as e:
-        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+        logger.error(f"Error running database diagnostics: {e}", exc_info=True)
+        return JSONResponse(status_code=500, content={"status": "error", "message": "Database diagnostic failed. Please check server logs."})
 
 @app.post("/api/oquiron")
 async def oquiron_endpoint(body: dict):
@@ -615,7 +684,7 @@ async def execute_code(body: ExecuteCodeRequest, request: Request, current_user:
     Safely execute Python code using the backend AST Security Inspector
     and sandboxed execution subprocess with stripped credentials.
     """
-    client_ip = request.client.host if request.client else "127.0.0.1"
+    client_ip = get_client_ip(request)
 
     # Anti-abuse rate limiting check
     if not rate_limiter.is_code_exec_allowed(client_ip):
@@ -679,22 +748,43 @@ async def Signout(body: dict):
 
 @app.get("/healthz")
 async def healthz():
-    """Liveness probe: verifies the ASGI worker process is alive."""
-    return JSONResponse(content={"status": "healthy", "timestamp": datetime.now(timezone.utc).isoformat()})
+    """Liveness probe: verifies process status and uptime."""
+    uptime_sec = round((datetime.now(timezone.utc) - SERVER_START_TIME).total_seconds(), 1)
+    return JSONResponse(content={
+        "status": "healthy",
+        "service": "mare-api",
+        "uptime_seconds": uptime_sec,
+        "python_version": sys.version.split()[0],
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    })
 
 @app.get("/readyz")
 async def readyz(conn: sqlite3.Connection = Depends(get_db)):
-    """Readiness probe: verifies database connectivity and core services."""
+    """Readiness probe: deep checks on database schema, tables, and security engine."""
     try:
         cursor = conn.cursor()
-        cursor.execute("SELECT 1")
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        tables = [r[0] for r in cursor.fetchall()]
+        
+        security_summary = auditor.get_summary()
+        
         return JSONResponse(content={
             "status": "ready",
-            "database": "connected",
+            "database": {
+                "status": "connected",
+                "tables_count": len(tables),
+                "tables": sorted(tables)
+            },
+            "security": {
+                "active": True,
+                "threats_blocked": security_summary.get("threat_counters", {}).get("total_threats_blocked", 0),
+                "total_events": security_summary.get("total_events_logged", 0)
+            },
             "timestamp": datetime.now(timezone.utc).isoformat()
         })
     except Exception as e:
-        return JSONResponse(status_code=503, content={"status": "not_ready", "error": str(e)})
+        logger.error(f"Readiness probe failed: {e}", exc_info=True)
+        return JSONResponse(status_code=503, content={"status": "not_ready", "error": "Database service is not ready."})
 
 if __name__ == "__main__":
     import uvicorn

@@ -5,6 +5,8 @@ import time
 import sys
 import subprocess
 import logging
+import tempfile
+import sqlite3
 from typing import Dict, List, Optional, Tuple, Any
 from datetime import datetime, timezone
 from collections import defaultdict
@@ -56,6 +58,19 @@ class SecurityAuditor:
             logger.error(log_msg)
         else:
             logger.warning(log_msg)
+
+        # Durable audit log persistence in database
+        try:
+            from database import get_connection
+            conn = get_connection()
+            conn.execute(
+                "INSERT INTO audit_logs (threat_type, severity, details, client_ip, blocked) VALUES (?, ?, ?, ?, ?)",
+                (threat_type, severity, details[:1000], client_ip, 1 if blocked else 0)
+            )
+            conn.commit()
+            conn.close()
+        except Exception:
+            pass
 
     def get_summary(self) -> Dict[str, Any]:
         return {
@@ -177,8 +192,26 @@ class CodeSecurityGuard:
     def execute_sandboxed(cls, code: str, timeout: int = 10, client_ip: str = "127.0.0.1") -> Dict[str, Any]:
         """
         Executes verified Python code in an isolated subprocess with stripped
-        environment credentials, bounded execution time, and stdout/stderr sanitation.
+        environment credentials, bounded execution time, ephemeral filesystem isolation,
+        and stdout/stderr sanitation.
         """
+        # Step 0: Payload size limit
+        if len(code) > 100_000:
+            auditor.record_event(
+                threat_type="PAYLOAD_SIZE_EXCEEDED",
+                severity="HIGH",
+                details=f"Code payload length ({len(code)} bytes) exceeds 100KB limit.",
+                client_ip=client_ip,
+                blocked=True
+            )
+            return {
+                "status": "error",
+                "stdout": "",
+                "stderr": "Security Exception: Code payload exceeds maximum allowed size (100KB).",
+                "returncode": 1,
+                "duration_ms": 0.0
+            }
+
         # Step 1: Pre-execution Static Security Analysis
         is_safe, violation = cls.analyze_code(code)
         if not is_safe:
@@ -197,38 +230,45 @@ class CodeSecurityGuard:
                 "duration_ms": 0.0
             }
 
-        # Step 2: Strip sensitive secrets from the execution environment
+        # Step 2: Strip sensitive secrets and enforce isolated Python environment
         sanitized_env = {}
-        sensitive_keywords = ['KEY', 'SECRET', 'TOKEN', 'AUTH', 'PASSWORD', 'CREDENTIAL', 'MISTRAL', 'GEMINI', 'GOOGLE']
+        sensitive_keywords = ['KEY', 'SECRET', 'TOKEN', 'AUTH', 'PASSWORD', 'CREDENTIAL', 'MISTRAL', 'GEMINI', 'GOOGLE', 'DATABASE']
         for k, v in os.environ.items():
             if not any(kw in k.upper() for kw in sensitive_keywords):
                 sanitized_env[k] = v
 
-        # Step 3: Run in isolated subprocess with strict resource bounds
+        sanitized_env["PYTHONPATH"] = ""
+        sanitized_env["PYTHONNOUSERSITE"] = "1"
+        sanitized_env["PYTHONDONTWRITEBYTECODE"] = "1"
+        sanitized_env["PYTHONUNBUFFERED"] = "1"
+
+        # Step 3: Run in isolated subprocess with ephemeral filesystem bounds
         start_time = time.time()
         safe_timeout = min(max(timeout or 5, 1), 15)  # Enforce 1s - 15s boundary
         
         try:
-            process = subprocess.run(
-                [sys.executable, "-c", code],
-                capture_output=True,
-                text=True,
-                timeout=safe_timeout,
-                env=sanitized_env
-            )
-            duration_ms = round((time.time() - start_time) * 1000, 2)
-            
-            # Step 4: Sanitize and truncate outputs (limit 30,000 chars to prevent DoS)
-            stdout = SecretScrubber.scrub_text(process.stdout[:30000])
-            stderr = SecretScrubber.scrub_text(process.stderr[:30000])
+            with tempfile.TemporaryDirectory(prefix="mare_sandbox_") as sandbox_dir:
+                process = subprocess.run(
+                    [sys.executable, "-I", "-c", code],
+                    capture_output=True,
+                    text=True,
+                    timeout=safe_timeout,
+                    env=sanitized_env,
+                    cwd=sandbox_dir
+                )
+                duration_ms = round((time.time() - start_time) * 1000, 2)
+                
+                # Step 4: Sanitize and truncate outputs (limit 30,000 chars to prevent DoS)
+                stdout = SecretScrubber.scrub_text(process.stdout[:30000])
+                stderr = SecretScrubber.scrub_text(process.stderr[:30000])
 
-            return {
-                "status": "success" if process.returncode == 0 else "error",
-                "stdout": stdout,
-                "stderr": stderr,
-                "returncode": process.returncode,
-                "duration_ms": duration_ms
-            }
+                return {
+                    "status": "success" if process.returncode == 0 else "error",
+                    "stdout": stdout,
+                    "stderr": stderr,
+                    "returncode": process.returncode,
+                    "duration_ms": duration_ms
+                }
 
         except subprocess.TimeoutExpired:
             duration_ms = round((time.time() - start_time) * 1000, 2)
@@ -462,6 +502,10 @@ class RateLimiter:
         self._requests: Dict[str, List[float]] = defaultdict(list)
         # Separate bucket for high-cost operations like code execution
         self._code_exec_requests: Dict[str, List[float]] = defaultdict(list)
+        # Login failure timestamps mapped by "ip:<ip>" and "email:<email>"
+        self._login_failures: Dict[str, List[float]] = defaultdict(list)
+        # Registration attempt timestamps mapped by IP
+        self._registration_requests: Dict[str, List[float]] = defaultdict(list)
 
     def is_allowed(self, client_ip: str, limit: int = 120, window_seconds: int = 60) -> bool:
         now = time.time()
@@ -499,6 +543,70 @@ class RateLimiter:
             return False
 
         self._code_exec_requests[client_ip].append(now)
+        return True
+
+    def check_login_rate_limit(self, client_ip: str, email: str = "", max_attempts: int = 5, window_seconds: int = 300) -> tuple:
+        """
+        Check whether client IP or target email has exceeded failed login attempts.
+        Returns: (is_allowed: bool, retry_after_seconds: int)
+        """
+        now = time.time()
+        
+        # Check by IP
+        ip_failures = [ts for ts in self._login_failures[f"ip:{client_ip}"] if now - ts < window_seconds]
+        self._login_failures[f"ip:{client_ip}"] = ip_failures
+
+        # Check by Email if provided
+        email_key = f"email:{email.lower().strip()}" if email else ""
+        email_failures = [ts for ts in self._login_failures[email_key] if now - ts < window_seconds] if email_key else []
+        if email_key:
+            self._login_failures[email_key] = email_failures
+
+        max_count = max(len(ip_failures), len(email_failures))
+        if max_count >= max_attempts:
+            oldest_ts = min((ip_failures or [now]) + (email_failures or [now]))
+            retry_after = max(1, int(window_seconds - (now - oldest_ts)))
+            auditor.record_event(
+                threat_type="BRUTE_FORCE_LOGIN_ATTEMPT",
+                severity="HIGH",
+                details=f"Login rate limit exceeded ({max_count}/{max_attempts} attempts). Target: {email or 'N/A'}",
+                client_ip=client_ip,
+                blocked=True
+            )
+            return False, retry_after
+
+        return True, 0
+
+    def record_login_failure(self, client_ip: str, email: str = ""):
+        """Record a failed login attempt for both IP and target email."""
+        now = time.time()
+        self._login_failures[f"ip:{client_ip}"].append(now)
+        if email:
+            self._login_failures[f"email:{email.lower().strip()}"].append(now)
+
+    def record_login_success(self, client_ip: str, email: str = ""):
+        """Reset failed login attempt counters upon successful authentication."""
+        self._login_failures.pop(f"ip:{client_ip}", None)
+        if email:
+            self._login_failures.pop(f"email:{email.lower().strip()}", None)
+
+    def is_registration_allowed(self, client_ip: str, limit: int = 10, window_seconds: int = 3600) -> bool:
+        """Enforce rate limits on new user registrations to block automated spam bots."""
+        now = time.time()
+        timestamps = self._registration_requests[client_ip]
+        self._registration_requests[client_ip] = [ts for ts in timestamps if now - ts < window_seconds]
+
+        if len(self._registration_requests[client_ip]) >= limit:
+            auditor.record_event(
+                threat_type="MASS_REGISTRATION_FLOODING",
+                severity="MEDIUM",
+                details=f"Registration rate limit exceeded: {len(self._registration_requests[client_ip])}/{limit} in {window_seconds}s",
+                client_ip=client_ip,
+                blocked=True
+            )
+            return False
+
+        self._registration_requests[client_ip].append(now)
         return True
 
 rate_limiter = RateLimiter()

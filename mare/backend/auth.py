@@ -25,27 +25,59 @@ security_bearer = HTTPBearer(auto_error=False)
 # =====================================================================
 
 def hash_password(password: str) -> str:
-    """Hash password using PBKDF2-HMAC-SHA256 with 100,000 iterations and 16-byte random salt."""
-    salt = secrets.token_hex(16)
+    """
+    Cryptographically secure password hashing using PBKDF2-HMAC-SHA256:
+    - 256-bit cryptographically random salt (secrets.token_hex(32))
+    - 200,000 iterations (OWASP recommended work factor)
+    - Returns formatted string: pbkdf2:sha256:200000$<salt>$<hex_key>
+    """
+    if not password:
+        raise ValueError("Password cannot be empty.")
+    if len(password) > 128:
+        raise ValueError("Password exceeds maximum allowed length of 128 characters.")
+    
+    salt = secrets.token_hex(32)
+    iterations = 200000
     key = hashlib.pbkdf2_hmac(
         "sha256", 
         password.encode("utf-8"), 
         salt.encode("utf-8"), 
-        100000
+        iterations
     )
-    return f"{salt}${key.hex()}"
+    return f"pbkdf2:sha256:{iterations}${salt}${key.hex()}"
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Constant-time verification of plain password against salt$hash string."""
+    """
+    Constant-time password verification supporting current and legacy hash formats:
+    - Modern format: pbkdf2:sha256:<iterations>$<salt>$<key_hex>
+    - Legacy format: <salt>$<key_hex> (100,000 iterations)
+    Uses hmac.compare_digest to prevent side-channel timing attacks.
+    """
+    if not plain_password or not hashed_password or len(plain_password) > 128:
+        return False
     try:
-        salt, key_hex = hashed_password.split("$", 1)
-        expected_key = hashlib.pbkdf2_hmac(
-            "sha256", 
-            plain_password.encode("utf-8"), 
-            salt.encode("utf-8"), 
-            100000
-        )
-        return hmac.compare_digest(expected_key.hex(), key_hex)
+        if hashed_password.startswith("pbkdf2:sha256:"):
+            # Format: pbkdf2:sha256:<iterations>$<salt>$<key_hex>
+            meta, salt, key_hex = hashed_password.split("$", 2)
+            iterations = int(meta.split(":")[-1])
+            expected_key = hashlib.pbkdf2_hmac(
+                "sha256", 
+                plain_password.encode("utf-8"), 
+                salt.encode("utf-8"), 
+                iterations
+            )
+            return hmac.compare_digest(expected_key.hex(), key_hex)
+        elif "$" in hashed_password:
+            # Legacy 2-part format: <salt>$<key_hex> (100,000 iterations)
+            salt, key_hex = hashed_password.split("$", 1)
+            expected_key = hashlib.pbkdf2_hmac(
+                "sha256", 
+                plain_password.encode("utf-8"), 
+                salt.encode("utf-8"), 
+                100000
+            )
+            return hmac.compare_digest(expected_key.hex(), key_hex)
+        return False
     except Exception as e:
         logger.warning(f"Password verification error: {e}")
         return False

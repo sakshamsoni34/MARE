@@ -6,7 +6,8 @@
     "dev": "node --no-deprecation ./node_modules/next/dist/bin/next dev",
     "build": "next build --webpack",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "node --test test/frontend_suite.test.mjs"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",

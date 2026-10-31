@@ -20,8 +20,12 @@ export default function RootPage() {
 
   useEffect(() => {
     async function loadState() {
+      const currentProject = useStore.getState().activeProject;
+      const currentFiles = useStore.getState().fileSystem;
+      if (currentProject && currentFiles.length > 0) return;
+
       const persistedState = await fetchState();
-      if (persistedState && persistedState.projects && persistedState.projects.length > 0) {
+      if (persistedState && persistedState.activeProject && persistedState.projects && persistedState.projects.length > 0) {
         useStore.getState().hydrateState(persistedState);
       }
     }

@@ -55,18 +55,22 @@ export const openWorkspaceFolder = async ({
   onRequireAuth,
   onSuccess
 }: OpenFolderOptions) => {
-  if (status !== 'authenticated') {
-    onRequireAuth();
-    return;
-  }
-
   try {
     if (typeof window !== 'undefined' && 'showDirectoryPicker' in window) {
       const dirHandle = await (window as any).showDirectoryPicker({ mode: 'readwrite' });
       const folderName = dirHandle.name;
-      const children = await readDirectoryRecursive(dirHandle);
+      const children = await readDirectoryRecursive(dirHandle, folderName);
 
-      useStore.getState().setFileSystem(children);
+      // Create root folder node so the opened folder itself is explicitly visible in the Explorer tree!
+      const rootFolderNode: FileSystemNode = {
+        id: folderName,
+        name: folderName,
+        type: 'folder',
+        isOpen: true,
+        children: children
+      };
+
+      useStore.getState().setFileSystem([rootFolderNode]);
       useStore.getState().setActiveProject(folderName);
       useStore.getState().addTerminalLog(`> <span class="text-green-400">Success:</span> Loaded workspace [${folderName}]`);
 
@@ -95,11 +99,11 @@ export const openWorkspaceFolder = async ({
           if (parts.length === 0) continue;
 
           let currentLevel = fileNodes;
-          let currentPath = '';
+          let currentPath = folderName;
 
           for (let p = 0; p < parts.length; p++) {
             const part = parts[p];
-            currentPath = currentPath ? `${currentPath}/${part}` : part;
+            currentPath = `${currentPath}/${part}`;
             const isFile = p === parts.length - 1;
 
             if (isFile) {
@@ -119,7 +123,15 @@ export const openWorkspaceFolder = async ({
           }
         }
 
-        useStore.getState().setFileSystem(fileNodes);
+        const rootFolderNode: FileSystemNode = {
+          id: folderName,
+          name: folderName,
+          type: 'folder',
+          isOpen: true,
+          children: fileNodes
+        };
+
+        useStore.getState().setFileSystem([rootFolderNode]);
         useStore.getState().setActiveProject(folderName);
         useStore.getState().addTerminalLog(`> <span class="text-green-400">Success:</span> Loaded workspace [${folderName}]`);
 

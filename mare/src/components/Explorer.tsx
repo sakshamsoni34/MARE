@@ -21,7 +21,22 @@ import { openWorkspaceFolder } from '@/lib/workspace';
 export default function Explorer() {
   const router = useRouter();
   const { status } = useSession();
-  const { fileSystem, createFile, createFolder, toggleFolder, expandFolder, collapseAllFolders, renameNode, deleteNode, selectedFolderId, setSelectedFolderId, activeProject, setEditorCode, addOpenAgent, updateAgentScript } = useStore();
+  const { 
+    fileSystem, 
+    createFile, 
+    createFolder, 
+    toggleFolder, 
+    expandFolder, 
+    collapseAllFolders, 
+    renameNode, 
+    deleteNode, 
+    selectedFolderId, 
+    setSelectedFolderId, 
+    activeProject, 
+    setEditorCode, 
+    addOpenAgent, 
+    updateAgentScript 
+  } = useStore();
   const [contextMenuInfo, setContextMenuInfo] = useState<{ x: number, y: number, nodeId: string } | null>(null);
   const [creatingItem, setCreatingItem] = useState<{ type: 'file' | 'folder', parentId: string | null } | null>(null);
   const [isExplorerExpanded, setIsExplorerExpanded] = useState(true);
@@ -36,17 +51,47 @@ export default function Explorer() {
     if (!content) return 'Researcher Agent';
     const match = content.match(/#\s+([a-zA-Z\s]+Agent)\s+(?:Script|Response)/i);
     if (match && match[1]) {
-      // Normalize capitalization
       const words = match[1].split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
       return words.join(' ');
     }
     return 'Researcher Agent';
   };
 
+  const findNode = (nodes: FileSystemNode[], id: string): FileSystemNode | undefined => {
+    for (const node of nodes) {
+      if (node.id === id) return node;
+      if (node.children) {
+        const found = findNode(node.children, id);
+        if (found) return found;
+      }
+    }
+    return undefined;
+  };
+
+  const findParentFolder = (nodes: FileSystemNode[], childId: string, parentId: string | null = null): string | null => {
+    for (const node of nodes) {
+      if (node.id === childId) return parentId;
+      if (node.children) {
+        const found = findParentFolder(node.children, childId, node.id);
+        if (found !== null) return found;
+      }
+    }
+    return null;
+  };
+
   const handleNewItem = (type: 'file' | 'folder') => {
     setIsExplorerExpanded(true);
-    if (selectedFolderId) expandFolder(selectedFolderId);
-    setCreatingItem({ type, parentId: selectedFolderId });
+    let targetParent: string | null = selectedFolderId;
+    if (targetParent) {
+      const found = findNode(fileSystem, targetParent);
+      if (found && found.type === 'file') {
+        targetParent = findParentFolder(fileSystem, targetParent);
+      }
+    } else if (fileSystem.length === 1 && fileSystem[0].type === 'folder') {
+      targetParent = fileSystem[0].id;
+    }
+    if (targetParent) expandFolder(targetParent);
+    setCreatingItem({ type, parentId: targetParent });
   };
 
   const handleNewFile = (e: React.MouseEvent) => { e.stopPropagation(); handleNewItem('file'); };
@@ -65,27 +110,49 @@ export default function Explorer() {
   const renderInput = (parentId: string | null, depth: number) => {
     if (creatingItem?.parentId !== parentId) return null;
     return (
-      <div className="flex items-center gap-1.5 py-1 px-2 text-sm" style={{ paddingLeft: `${depth * 12 + 8}px` }}>
+      <div 
+        className="flex items-center gap-1.5 py-1 px-2 text-sm bg-brand-500/15 border-l-2 border-brand-400 my-0.5 rounded-r"
+        style={{ paddingLeft: `${depth * 12 + 8}px` }}
+        onClick={(e) => e.stopPropagation()}
+      >
         <span className="w-[14px] shrink-0" />
-        <span className="text-text-secondary">
-          {creatingItem.type === 'folder' ? <Folder size={14} /> : <File size={14} />}
+        <span className="shrink-0">
+          {creatingItem.type === 'folder' ? (
+            <Folder size={14} className="text-amber-400" />
+          ) : (
+            <File size={14} className="text-sky-400" />
+          )}
         </span>
         <input
           autoFocus
-          className="bg-[#3c3c3c] text-[#cccccc] border border-[#0078d4] outline-none px-1 w-full text-sm rounded-sm"
+          placeholder={creatingItem.type === 'file' ? 'filename.py (Press Enter)' : 'folder-name (Press Enter)'}
+          className="bg-[#242424] text-white border border-brand-500/60 outline-none px-2 py-0.5 w-full text-xs rounded font-mono shadow-inner focus:border-brand-400"
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
               const val = e.currentTarget.value.trim();
               if (val) {
-                if (creatingItem.type === 'file') createFile(parentId, val);
-                else createFolder(parentId, val);
+                if (creatingItem.type === 'file') {
+                  createFile(parentId, val);
+                } else {
+                  createFolder(parentId, val);
+                }
               }
               setCreatingItem(null);
             } else if (e.key === 'Escape') {
               setCreatingItem(null);
             }
           }}
-          onBlur={() => setCreatingItem(null)}
+          onBlur={(e) => {
+            const val = e.currentTarget.value.trim();
+            if (val) {
+              if (creatingItem.type === 'file') {
+                createFile(parentId, val);
+              } else {
+                createFolder(parentId, val);
+              }
+            }
+            setCreatingItem(null);
+          }}
         />
       </div>
     );
@@ -104,7 +171,7 @@ export default function Explorer() {
           onClick={(e) => {
             e.stopPropagation();
             setSelectedFolderId(node.id);
-            toggleFolder(node.id); // Toggle both folders and files
+            toggleFolder(node.id);
             if (!isFolder) {
               setEditorCode(node.content || '');
             }
@@ -122,11 +189,15 @@ export default function Explorer() {
                 {node.isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
               </span>
             ) : (
-              <span className="w-[14px] shrink-0" /> // Spacer for alignment
+              <span className="w-[14px] shrink-0" />
             )}
 
-            <span className={isFolder ? 'text-text-tertiary' : 'text-text-secondary'}>
-              {isFolder ? <Folder size={14} /> : <File size={14} />}
+            <span className={isFolder ? 'text-amber-400' : 'text-text-secondary'}>
+              {isFolder ? (
+                node.isOpen ? <FolderOpen size={14} className="text-amber-400/90" /> : <Folder size={14} className="text-amber-400/70" />
+              ) : (
+                <File size={14} className="text-sky-400/70" />
+              )}
             </span>
             <span className="truncate">{node.name}</span>
           </div>
@@ -210,7 +281,16 @@ export default function Explorer() {
         {isFolder && node.isOpen && (
           <div className="flex flex-col">
             {renderInput(node.id, depth + 1)}
-            {node.children && node.children.map(child => renderNode(child, depth + 1))}
+            {node.children && node.children.length > 0 ? (
+              node.children.map(child => renderNode(child, depth + 1))
+            ) : (
+              <div 
+                className="py-1 px-2 text-xs text-text-tertiary/70 italic select-none" 
+                style={{ paddingLeft: `${(depth + 1) * 12 + 16}px` }}
+              >
+                (empty folder)
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -274,18 +354,60 @@ export default function Explorer() {
         <div
           className="flex-1 overflow-y-auto custom-scrollbar pb-6"
           onClick={(e) => {
-            // If clicked in the empty space, deselect the node
             if (e.target === e.currentTarget) {
               setSelectedFolderId(null);
             }
           }}
         >
           {activeProject ? (
-            <>
+            <div className="flex flex-col min-h-full">
+              {/* Always render root-level input when creating item at root */}
               {renderInput(null, 0)}
-              {fileSystem.map(node => renderNode(node, 0))}
-            </>
-          ) : null}
+
+              {fileSystem.length === 0 && !creatingItem ? (
+                <div className="flex flex-col items-center justify-center p-6 text-center text-text-tertiary gap-3 select-none">
+                  <p className="text-xs">No files in "{activeProject}".</p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleNewItem('file');
+                      }}
+                      className="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-white/10 hover:bg-white/20 transition-all border border-white/10 shadow-sm"
+                    >
+                      + New File
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleNewItem('folder');
+                      }}
+                      className="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-white/10 hover:bg-white/20 transition-all border border-white/10 shadow-sm"
+                    >
+                      + New Folder
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                fileSystem.map(node => renderNode(node, 0))
+              )}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center p-6 text-center text-text-tertiary h-48 gap-3 select-none">
+              <FolderOpen size={30} className="text-brand-400/60" />
+              <p className="text-xs">No folder open in workspace.</p>
+              <button
+                onClick={() => openWorkspaceFolder({
+                  status,
+                  onRequireAuth: () => useStore.getState().setSignInModalOpen(true),
+                  onSuccess: () => router.push('/dashboard')
+                })}
+                className="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-brand-500 hover:bg-brand-600 transition-colors shadow-sm"
+              >
+                Open Folder
+              </button>
+            </div>
+          )}
         </div>
       )}
 

@@ -383,6 +383,11 @@ export default function TerminalOutput() {
                   <td className="py-1">MARE Dashboard UI</td>
                   <td className="py-1 text-green-400">Active</td>
                 </tr>
+                <tr className="border-b border-white/5">
+                  <td className="py-1">3306</td>
+                  <td className="py-1">MySQL Database (mare)</td>
+                  <td className="py-1 text-green-400">Connected</td>
+                </tr>
                 <tr>
                   <td className="py-1">8555</td>
                   <td className="py-1">FastAPI Backend & Sandbox Engine</td>

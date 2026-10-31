@@ -94,6 +94,8 @@ export default function Sidebar() {
     toggleWorkflow, 
     isWorkflowOpen, 
     activeProject, 
+    projects,
+    setActiveProject,
     isSidebarOpen, 
     toggleSidebar 
   } = useStore();
@@ -307,7 +309,35 @@ export default function Sidebar() {
           </div>
         );
       case 'Projects':
-        return <div className="p-4 text-text-secondary text-sm">Projects List</div>;
+        return (
+          <div className="flex flex-col gap-2 p-3 text-xs">
+            <div className="text-[10px] font-bold tracking-widest text-text-tertiary uppercase mb-1">
+              Workspaces ({projects.length})
+            </div>
+            {projects.length === 0 ? (
+              <div className="text-gray-500 text-xs italic px-2 py-4">
+                No projects found. Upload a folder in Explorer to initialize a workspace.
+              </div>
+            ) : (
+              projects.map((proj) => (
+                <div
+                  key={proj}
+                  onClick={() => setActiveProject(proj)}
+                  className={`flex items-center justify-between px-3 py-2 rounded-lg cursor-pointer transition-colors border ${
+                    activeProject === proj
+                      ? 'bg-brand-500/20 text-white border-brand-500/40'
+                      : 'text-gray-400 hover:text-white hover:bg-white/5 border-transparent'
+                  }`}
+                >
+                  <span className="font-medium truncate">{proj}</span>
+                  {activeProject === proj && (
+                    <span className="text-[10px] text-brand-400 font-semibold bg-brand-500/20 px-1.5 py-0.5 rounded">Active</span>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        );
       case 'Settings':
         return (
           <div className="p-4 text-text-secondary text-xs flex flex-col gap-3">
