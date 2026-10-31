@@ -40,9 +40,13 @@ export default function SignInModal() {
       updateAgentScript('Orqion', '');
       setIsLoading(true);
       setErrorMsg('');
-      await signIn('google', { callbackUrl: '/' }, { prompt: 'select_account' });
+      const res = await signIn('google', { callbackUrl: 'https://mare-dun-six.vercel.app' });
+      if (res?.error) {
+        setErrorMsg('Google OAuth is not configured on Vercel yet. Please enter your email below to sign in instantly.');
+      }
     } catch (err: any) {
-      setErrorMsg(err?.message || 'Google sign-in encountered an issue. You can sign in with your email below.');
+      setErrorMsg('Google OAuth requires GOOGLE_CLIENT_ID & GOOGLE_CLIENT_SECRET in Vercel settings. You can sign in instantly with your email below.');
+    } finally {
       setIsLoading(false);
     }
   };

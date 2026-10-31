@@ -2,15 +2,9 @@ import NextAuth, { NextAuthOptions } from 'next-auth';
 import GoogleProvider from 'next-auth/providers/google';
 import CredentialsProvider from 'next-auth/providers/credentials';
 
-// Ensure NEXTAUTH_URL is defined on Vercel deployments if not explicitly set
-if (!process.env.NEXTAUTH_URL) {
-    if (process.env.VERCEL_URL) {
-        process.env.NEXTAUTH_URL = `https://${process.env.VERCEL_URL}`;
-    } else if (process.env.NEXT_PUBLIC_VERCEL_URL) {
-        process.env.NEXTAUTH_URL = `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`;
-    } else {
-        process.env.NEXTAUTH_URL = 'https://mare-dun-six.vercel.app';
-    }
+// Ensure NEXTAUTH_URL is always the canonical production domain
+if (!process.env.NEXTAUTH_URL || process.env.NEXTAUTH_URL.includes('-projects.vercel.app')) {
+    process.env.NEXTAUTH_URL = 'https://mare-dun-six.vercel.app';
 }
 
 // Fallback secret ensures production deployments on Vercel never crash with MissingSecret
@@ -150,8 +144,12 @@ const authOptions: NextAuthOptions = {
             return session;
         },
         async redirect({ url, baseUrl }) {
-            if (url.startsWith('/')) return `${baseUrl}${url}`;
-            else if (new URL(url).origin === baseUrl) return url;
+            try {
+                if (url.startsWith('/')) return `${baseUrl.replace(/\/$/, '')}${url}`;
+                const parsedUrl = new URL(url);
+                const parsedBase = new URL(baseUrl);
+                if (parsedUrl.origin === parsedBase.origin) return url;
+            } catch {}
             return baseUrl;
         },
     }

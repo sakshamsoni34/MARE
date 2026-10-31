@@ -297,7 +297,7 @@ export default function MenuBar({ onNewFile, onNewFolder, showProfile = true, sh
             </button>
           )}
           
-          {(showProfile || status === 'authenticated') && (
+          {status === 'authenticated' && (
             <div className="relative">
               <div
                 className={`p-1 ml-3 rounded-full cursor-pointer flex items-center justify-center border transition-all ${activeMenu === 'Profile' ? 'border-brand-400 bg-white/10' : 'border-transparent hover:border-white/20'}`}
