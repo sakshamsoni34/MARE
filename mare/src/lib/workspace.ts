@@ -58,49 +58,60 @@ export const readDirectoryRecursive = async (
   });
 };
 
-const processFileList = async (files: FileList, onSuccess?: (folderName: string) => void) => {
-  const firstPath = files[0].webkitRelativePath || files[0].name;
-  const folderName = firstPath.split('/')[0] || 'Workspace';
+const processFileList = async (
+  files: FileList, 
+  onSuccess?: (folderName: string) => void,
+  fallbackFolderName: string = 'Workspace'
+) => {
+  let folderName = fallbackFolderName;
+  if (files && files.length > 0) {
+    const firstPath = files[0].webkitRelativePath || files[0].name;
+    if (firstPath && firstPath.includes('/')) {
+      folderName = firstPath.split('/')[0] || fallbackFolderName;
+    }
+  }
 
   const fileNodes: FileSystemNode[] = [];
 
-  for (let i = 0; i < files.length; i++) {
-    const file = files[i];
-    const pathParts = file.webkitRelativePath.split('/');
-    if (pathParts.some(part => IGNORED.has(part))) continue;
+  if (files && files.length > 0) {
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const pathParts = file.webkitRelativePath.split('/');
+      if (pathParts.some(part => IGNORED.has(part))) continue;
 
-    const parts = pathParts.slice(1);
-    if (parts.length === 0) continue;
+      const parts = pathParts.slice(1);
+      if (parts.length === 0) continue;
 
-    let currentLevel = fileNodes;
-    let currentPath = folderName;
+      let currentLevel = fileNodes;
+      let currentPath = folderName;
 
-    for (let p = 0; p < parts.length; p++) {
-      const part = parts[p];
-      currentPath = `${currentPath}/${part}`;
-      const isFile = p === parts.length - 1;
+      for (let p = 0; p < parts.length; p++) {
+        const part = parts[p];
+        currentPath = `${currentPath}/${part}`;
+        const isFile = p === parts.length - 1;
 
-      if (isFile) {
-        let content = '';
-        try {
-          if (file.size < 200000) {
-            content = await file.text();
+        if (isFile) {
+          let content = '';
+          try {
+            if (file.size < 200000) {
+              content = await file.text();
+            }
+          } catch (_) {}
+          currentLevel.push({ id: currentPath, name: part, type: 'file', content });
+        } else {
+          let existingFolder = currentLevel.find(n => n.name === part && n.type === 'folder');
+          if (!existingFolder) {
+            existingFolder = { 
+              id: currentPath, 
+              name: part, 
+              type: 'folder', 
+              isOpen: p === 0, 
+              children: [] 
+            };
+            currentLevel.push(existingFolder);
           }
-        } catch (_) {}
-        currentLevel.push({ id: currentPath, name: part, type: 'file', content });
-      } else {
-        let existingFolder = currentLevel.find(n => n.name === part && n.type === 'folder');
-        if (!existingFolder) {
-          existingFolder = { 
-            id: currentPath, 
-            name: part, 
-            type: 'folder', 
-            isOpen: p === 0, 
-            children: [] 
-          };
-          currentLevel.push(existingFolder);
+          currentLevel = existingFolder.children!;
         }
-        currentLevel = existingFolder.children!;
       }
     }
   }
@@ -136,8 +147,19 @@ const triggerFileInputFallback = (onSuccess?: (folderName: string) => void) => {
   input.onchange = async (e: any) => {
     try {
       const files: FileList = e.target.files;
-      if (!files || files.length === 0) return;
-      await processFileList(files, onSuccess);
+      let folderName = 'Workspace';
+
+      if (input.value) {
+        const parts = input.value.split(/[\\/]/);
+        const last = parts[parts.length - 1];
+        if (last && last.toLowerCase() !== 'fakepath') {
+          folderName = last;
+        }
+      }
+
+      await processFileList(files, onSuccess, folderName);
+    } catch (err) {
+      console.error('Error processing directory input:', err);
     } finally {
       if (document.body.contains(input)) {
         document.body.removeChild(input);
