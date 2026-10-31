@@ -11,6 +11,28 @@ export default function SignInModal() {
   const [errorMsg, setErrorMsg] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const err = params.get('error');
+      if (err) {
+        setSignInModalOpen(true);
+        if (err === 'Configuration') {
+          setErrorMsg('Configuration notice: NEXTAUTH_SECRET or Google OAuth credentials were not initialized in Vercel. You can also sign in via 1-Click Demo.');
+        } else if (err === 'AccessDenied') {
+          setErrorMsg('Access denied. You do not have permission to sign in.');
+        } else if (err === 'Verification') {
+          setErrorMsg('The verification token has expired or has already been used.');
+        } else if (err === 'OAuthSignin' || err === 'OAuthCallback') {
+          setErrorMsg('OAuth error: Please ensure Google Cloud Console Authorized redirect URI includes https://mare-dun-six.vercel.app/api/auth/callback/google');
+        } else {
+          setErrorMsg(`Authentication error: ${err}`);
+        }
+        window.history.replaceState({}, '', window.location.pathname);
+      }
+    }
+  }, [setSignInModalOpen]);
+
   if (!isSignInModalOpen) return null;
 
   const handleGoogleSignIn = () => {
