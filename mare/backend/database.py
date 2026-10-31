@@ -207,16 +207,24 @@ def get_connection():
     """
     if DB_TYPE == "mysql" and HAS_PYMYSQL:
         try:
-            raw = pymysql.connect(
-                host=DB_HOST,
-                port=DB_PORT,
-                user=DB_USER,
-                password=DB_PASSWORD,
-                database=DB_NAME,
-                autocommit=True,
-                charset="utf8mb4",
-                cursorclass=pymysql.cursors.DictCursor
-            )
+            connect_kwargs = {
+                "host": DB_HOST,
+                "port": DB_PORT,
+                "user": DB_USER,
+                "password": DB_PASSWORD,
+                "database": DB_NAME,
+                "autocommit": True,
+                "charset": "utf8mb4",
+                "cursorclass": pymysql.cursors.DictCursor,
+                "connect_timeout": 10
+            }
+            # Auto-enable SSL for remote cloud databases like TiDB Cloud / Aiven
+            db_ssl_env = os.getenv("DB_SSL", "").lower()
+            if db_ssl_env in ("true", "1", "yes") or (DB_HOST not in ("localhost", "127.0.0.1") and db_ssl_env != "false"):
+                connect_kwargs["ssl_verify_cert"] = True
+                connect_kwargs["ssl_verify_identity"] = True
+
+            raw = pymysql.connect(**connect_kwargs)
             return MySQLConnectionWrapper(raw)
         except Exception as e:
             logger.warning(f"Unable to connect to MySQL database '{DB_NAME}' ({e}). Falling back to SQLite.")
