@@ -153,7 +153,10 @@ export const useStore = create<StoreState>()(
     pastConversations: [],
     hubSelectedAgents: ['Planner Agent', 'Reviewer Agent'],
 
-    setActiveProject: (project) => set({ activeProject: project }),
+    setActiveProject: (project) => set((state) => ({
+      activeProject: project,
+      projects: project && !state.projects.includes(project) ? [...state.projects, project] : state.projects
+    })),
     setSignInModalOpen: (isOpen) => set({ isSignInModalOpen: isOpen }),
     setActiveAgent: (agent) => set((state) => {
       if (state.activeAgent === agent) return state;
