@@ -35,9 +35,16 @@ export default function SignInModal() {
 
   if (!isSignInModalOpen) return null;
 
-  const handleGoogleSignIn = () => {
-    updateAgentScript('Orqion', '');
-    signIn('google', { callbackUrl: '/' }, { prompt: 'select_account' });
+  const handleGoogleSignIn = async () => {
+    try {
+      updateAgentScript('Orqion', '');
+      setIsLoading(true);
+      setErrorMsg('');
+      await signIn('google', { callbackUrl: '/' }, { prompt: 'select_account' });
+    } catch (err: any) {
+      setErrorMsg(err?.message || 'Google sign-in encountered an issue.');
+      setIsLoading(false);
+    }
   };
 
   const handleCredentialsSubmit = async (e: React.FormEvent) => {
@@ -72,19 +79,32 @@ export default function SignInModal() {
 
   const handleDemoSignIn = async () => {
     setIsLoading(true);
-    await signIn('credentials', {
-      email: 'developer@mare.ai',
-      password: '',
-      isRegister: 'false',
-      redirect: false,
-    });
-    setSignInModalOpen(false);
-    addTerminalLog('> <span class="text-accent-green">✓ Signed in as MARE Developer.</span>');
-    setIsLoading(false);
+    setErrorMsg('');
+    try {
+      const res = await signIn('credentials', {
+        email: 'developer@mare.ai',
+        password: '',
+        isRegister: 'false',
+        redirect: false,
+      });
+      if (res?.error) {
+        setErrorMsg('Demo sign-in failed: ' + res.error);
+      } else {
+        setSignInModalOpen(false);
+        addTerminalLog('> <span class="text-accent-green">✓ Signed in as MARE Developer.</span>');
+      }
+    } catch (err: any) {
+      setErrorMsg(err?.message || 'Failed to sign in as demo developer.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 backdrop-blur-md p-4">
+    <div 
+      onClick={(e) => { if (e.target === e.currentTarget) setSignInModalOpen(false); }}
+      className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/75 backdrop-blur-md p-4"
+    >
       <div className="relative w-full max-w-md rounded-2xl border border-white/10 bg-[#121316] p-7 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
         <button
           onClick={() => setSignInModalOpen(false)}

@@ -119,7 +119,6 @@ export default function RootPage() {
           </div>
         </div>
       </footer>
-      <SignInModal />
     </div>
   );
 }

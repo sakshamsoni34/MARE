@@ -3,6 +3,7 @@
 import { SessionProvider, useSession } from "next-auth/react";
 import React, { useEffect } from "react";
 import { setApiAuthToken } from "@/lib/api";
+import SignInModal from "@/components/SignInModal";
 
 function AuthTokenSync() {
   const { data: session } = useSession();
@@ -21,6 +22,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <SessionProvider refetchInterval={5 * 60}>
       <AuthTokenSync />
       {children}
+      <SignInModal />
     </SessionProvider>
   );
 }

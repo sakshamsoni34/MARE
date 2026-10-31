@@ -16,7 +16,7 @@ interface MenuBarProps {
   showSignIn?: boolean;
 }
 
-export default function MenuBar({ onNewFile, onNewFolder, showProfile = false, showSignIn = false }: MenuBarProps) {
+export default function MenuBar({ onNewFile, onNewFolder, showProfile = true, showSignIn = true }: MenuBarProps) {
   const router = useRouter();
   const { data: session, status } = useSession();
   const [activeMenu, setActiveMenu] = useState<MenuState>(null);
@@ -220,7 +220,13 @@ export default function MenuBar({ onNewFile, onNewFolder, showProfile = false, s
               }} />
             </>
           ) : (
-            <MenuItem label="Sign In" onClick={() => handleAction('Sign In')} />
+            <MenuItem 
+              label="Sign In" 
+              onClick={() => {
+                setActiveMenu(null);
+                useStore.getState().setSignInModalOpen(true);
+              }} 
+            />
           )}
         </div>
       </motion.div>
