@@ -376,10 +376,11 @@ export const useStore = create<StoreState>()(
     renameNode: (id, newName) => {
       let targetNode: FileSystemNode | undefined;
       set((state) => {
+        const isRoot = state.activeProject === id || (state.fileSystem.length > 0 && state.fileSystem[0].id === id);
         const renameInNodes = (nodes: FileSystemNode[]): FileSystemNode[] => {
           return nodes.map(node => {
             if (node.id === id) {
-              targetNode = { ...node, name: newName };
+              targetNode = { ...node, name: newName, ...(isRoot ? { id: newName } : {}) };
               return targetNode;
             }
             if (node.children) {
@@ -388,7 +389,11 @@ export const useStore = create<StoreState>()(
             return node;
           });
         };
-        return { fileSystem: renameInNodes(state.fileSystem) };
+        const newFs = renameInNodes(state.fileSystem);
+        return {
+          fileSystem: newFs,
+          ...(isRoot ? { activeProject: newName } : {})
+        };
       });
 
       if (targetNode) {

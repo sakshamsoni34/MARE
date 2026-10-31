@@ -147,14 +147,26 @@ const triggerFileInputFallback = (onSuccess?: (folderName: string) => void) => {
   input.onchange = async (e: any) => {
     try {
       const files: FileList = e.target.files;
-      let folderName = 'Workspace';
 
-      if (input.value) {
-        const parts = input.value.split(/[\\/]/);
-        const last = parts[parts.length - 1];
-        if (last && last.toLowerCase() !== 'fakepath') {
-          folderName = last;
+      if (!files || files.length === 0) {
+        let folderName = 'TEST';
+        if (typeof window !== 'undefined') {
+          const userChosen = window.prompt('You selected an empty folder. Enter project folder name:', 'TEST');
+          if (userChosen === null) {
+            return;
+          }
+          if (userChosen.trim()) {
+            folderName = userChosen.trim();
+          }
         }
+        await processFileList(files, onSuccess, folderName);
+        return;
+      }
+
+      let folderName = 'Workspace';
+      const firstPath = files[0].webkitRelativePath || files[0].name;
+      if (firstPath && firstPath.includes('/')) {
+        folderName = firstPath.split('/')[0];
       }
 
       await processFileList(files, onSuccess, folderName);

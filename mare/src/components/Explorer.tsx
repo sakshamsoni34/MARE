@@ -40,6 +40,25 @@ export default function Explorer() {
   const [contextMenuInfo, setContextMenuInfo] = useState<{ x: number, y: number, nodeId: string } | null>(null);
   const [creatingItem, setCreatingItem] = useState<{ type: 'file' | 'folder', parentId: string | null } | null>(null);
   const [isExplorerExpanded, setIsExplorerExpanded] = useState(true);
+  const [isEditingProjectName, setIsEditingProjectName] = useState(false);
+  const [projectNameInput, setProjectNameInput] = useState('');
+
+  const handleSaveProjectNameDirect = (newName: string) => {
+    const trimmed = newName.trim();
+    if (trimmed && trimmed !== activeProject) {
+      useStore.getState().setActiveProject(trimmed);
+      const currentFs = useStore.getState().fileSystem;
+      if (currentFs.length > 0 && currentFs[0].type === 'folder') {
+        const updatedFs = currentFs.map((item, idx) => idx === 0 ? { ...item, id: trimmed, name: trimmed } : item);
+        useStore.getState().setFileSystem(updatedFs);
+      }
+    }
+  };
+
+  const handleSaveProjectName = () => {
+    handleSaveProjectNameDirect(projectNameInput);
+    setIsEditingProjectName(false);
+  };
 
   React.useEffect(() => {
     const handleClick = () => setContextMenuInfo(null);
@@ -301,21 +320,45 @@ export default function Explorer() {
     <aside className="w-64 shrink-0 border-r border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] flex flex-col h-full select-none">
       <div
         className="flex items-center justify-between p-2 hover:bg-[var(--color-bg-tertiary)] cursor-pointer transition-colors group relative"
-        onClick={() => setIsExplorerExpanded(!isExplorerExpanded)}
+        onClick={() => {
+          if (!isEditingProjectName) {
+            setIsExplorerExpanded(!isExplorerExpanded);
+          }
+        }}
         onContextMenu={(e) => {
           e.preventDefault();
           e.stopPropagation();
           setContextMenuInfo({ x: e.pageX, y: e.pageY, nodeId: 'ROOT' });
         }}
       >
-        <div className="flex items-center gap-1 overflow-hidden">
-          <span className="text-text-tertiary shrink-0">
-            {isExplorerExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-          </span>
-          <span className="text-xs font-bold text-text-tertiary uppercase tracking-wider truncate">
-            {activeProject ? activeProject : 'NO FOLDER OPEN'}
-          </span>
-        </div>
+        {isEditingProjectName ? (
+          <div onClick={(e) => e.stopPropagation()} className="flex items-center gap-1 flex-1">
+            <input
+              autoFocus
+              type="text"
+              value={projectNameInput}
+              onChange={(e) => setProjectNameInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleSaveProjectName();
+                if (e.key === 'Escape') setIsEditingProjectName(false);
+              }}
+              onBlur={handleSaveProjectName}
+              className="text-xs font-bold bg-[#1e1e1e] border border-brand-500 rounded px-1.5 py-0.5 text-white outline-none w-36 uppercase tracking-wider"
+            />
+          </div>
+        ) : (
+          <div 
+            className="flex items-center gap-1 overflow-hidden flex-1 cursor-pointer"
+            title="Click to toggle, or click edit to rename"
+          >
+            <span className="text-text-tertiary shrink-0">
+              {isExplorerExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+            </span>
+            <span className="text-xs font-bold text-text-tertiary uppercase tracking-wider truncate">
+              {activeProject ? activeProject : 'NO FOLDER OPEN'}
+            </span>
+          </div>
+        )}
         {!activeProject && (
           <button
             onClick={(e) => {
@@ -334,6 +377,17 @@ export default function Explorer() {
         )}
         {activeProject && (
           <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button 
+              onClick={(e) => {
+                e.stopPropagation();
+                setProjectNameInput(activeProject);
+                setIsEditingProjectName(true);
+              }} 
+              className="p-1 hover:bg-[#3c3c3c] rounded text-text-tertiary hover:text-text-primary transition-colors" 
+              title="Rename Workspace Folder"
+            >
+              <Edit2 size={13} />
+            </button>
             <button onClick={handleNewFile} className="p-1 hover:bg-[#3c3c3c] rounded text-text-tertiary hover:text-text-primary transition-colors" title="New File">
               <FilePlus size={15} />
             </button>
@@ -416,12 +470,28 @@ export default function Explorer() {
           className="fixed z-[100] w-48 rounded-md border border-[var(--color-border-primary)] bg-[var(--color-bg-secondary)] shadow-xl py-1 overflow-hidden"
           style={{ top: contextMenuInfo.y, left: contextMenuInfo.x }}
         >
+          {contextMenuInfo.nodeId === 'ROOT' && activeProject && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                const newName = window.prompt('Enter new workspace folder name:', activeProject);
+                if (newName && newName.trim()) {
+                  handleSaveProjectNameDirect(newName.trim());
+                }
+                setContextMenuInfo(null);
+              }}
+              className="flex w-full items-center gap-2 px-4 py-2 text-sm text-text-primary hover:bg-[var(--color-bg-tertiary)] transition-colors text-left"
+            >
+              <Edit2 size={14} /> Rename Workspace
+            </button>
+          )}
           {contextMenuInfo.nodeId !== 'ROOT' && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                const nodeToRename = document.querySelector(`[data-node-id="${contextMenuInfo.nodeId}"]`)?.textContent;
-                const newName = window.prompt('Enter new name:', nodeToRename || '');
+                const targetNode = findNode(fileSystem, contextMenuInfo.nodeId);
+                const currentName = targetNode?.name || '';
+                const newName = window.prompt('Enter new name:', currentName);
                 if (newName && newName.trim()) {
                   renameNode(contextMenuInfo.nodeId, newName.trim());
                 }
